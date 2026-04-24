@@ -1,12 +1,44 @@
 import 'package:flutter/material.dart';
+import '../models/movie.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
+import '../services/movie_service.dart';
 import 'login_page.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   final User user;
 
   const HomePage({super.key, required this.user});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  List<Movie> _movies = [];
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTrending();
+  }
+
+  Future<void> _loadTrending() async {
+    try {
+      final movies = await MovieService().getTrendingMovies();
+      setState(() {
+        _movies = movies;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString().replaceAll('Exception: ', '');
+        _isLoading = false;
+      });
+    }
+  }
 
   Future<void> _logout(BuildContext context) async {
     await AuthService().logout();
@@ -20,6 +52,7 @@ class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.black,
         title: const Text(
@@ -42,32 +75,137 @@ class HomePage extends StatelessWidget {
           child: Container(height: 1, color: const Color(0xFF222222)),
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Bonjour, ${user.firstName} ',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 26,
-                fontWeight: FontWeight.w800,
+      body: _isLoading
+          ? const Center(
+        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+      )
+          : _error != null
+          ? Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Text(
+            _error!,
+            style: const TextStyle(color: Color(0xFFFF4444), fontSize: 14),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      )
+          : CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 28, 20, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Bonjour, ${widget.user.firstName}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Voici les tendances de la semaine',
+                    style: TextStyle(
+                      color: Color(0xFF888888),
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              user.email,
-              style: const TextStyle(color: Color(0xFF888888), fontSize: 14),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+            sliver: SliverGrid(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 16,
+                childAspectRatio: 0.58,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                    (context, index) => _MovieCard(movie: _movies[index]),
+                childCount: _movies.length,
+              ),
             ),
-            const SizedBox(height: 48),
-            const Text(
-              'Votre espace CineArt est prêt.',
-              style: TextStyle(color: Color(0xFF555555), fontSize: 15),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MovieCard extends StatelessWidget {
+  final Movie movie;
+
+  const _MovieCard({required this.movie});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: movie.posterPath.isNotEmpty
+                ? Image.network(
+              movie.posterUrl,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Container(
+                  color: const Color(0xFF1A1A1A),
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 1.5,
+                    ),
+                  ),
+                );
+              },
+              errorBuilder: (context, error, stackTrace) => Container(
+                color: const Color(0xFF1A1A1A),
+                child: const Icon(Icons.movie, color: Color(0xFF333333), size: 40),
+              ),
+            )
+                : Container(
+              color: const Color(0xFF1A1A1A),
+              child: const Icon(Icons.movie, color: Color(0xFF333333), size: 40),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          movie.title,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            const Icon(Icons.star, color: Colors.white, size: 12),
+            const SizedBox(width: 4),
+            Text(
+              movie.voteAverage.toStringAsFixed(1),
+              style: const TextStyle(
+                color: Color(0xFF888888),
+                fontSize: 12,
+              ),
             ),
           ],
         ),
-      ),
+      ],
     );
   }
 }
