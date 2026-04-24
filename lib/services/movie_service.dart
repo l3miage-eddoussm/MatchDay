@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/movie.dart';
+import '../models/movie_detail.dart';
 
 class MovieService {
   static final MovieService _instance = MovieService._internal();
@@ -31,5 +32,50 @@ class MovieService {
     final data = jsonDecode(response.body);
     final List results = data['results'];
     return results.map((e) => Movie.fromJson(e)).toList();
+  }
+
+  Future<Movie> getMovieDetails(int movieId) async {
+    final response = await http.get(
+      Uri.parse('$_baseUrl/movie/$movieId?language=fr-FR'),
+      headers: _headers,
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Impossible de charger les détails du film.');
+    }
+
+    return Movie.fromJson(jsonDecode(response.body));
+  }
+
+  Future<List<MovieVideo>> getMovieVideos(int movieId) async {
+    final response = await http.get(
+      Uri.parse('$_baseUrl/movie/$movieId/videos?language=fr-FR'),
+      headers: _headers,
+    );
+
+    if (response.statusCode != 200) return [];
+
+    final data = jsonDecode(response.body);
+    final List results = data['results'];
+    return results
+        .map((e) => MovieVideo.fromJson(e))
+        .where((v) => v.site == 'YouTube')
+        .toList();
+  }
+
+  Future<List<MovieImage>> getMovieImages(int movieId) async {
+    final response = await http.get(
+      Uri.parse('$_baseUrl/movie/$movieId/images'),
+      headers: _headers,
+    );
+
+    if (response.statusCode != 200) return [];
+
+    final data = jsonDecode(response.body);
+    final List backdrops = data['backdrops'] ?? [];
+    return backdrops
+        .take(10)
+        .map((e) => MovieImage.fromJson(e))
+        .toList();
   }
 }
