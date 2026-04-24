@@ -24,14 +24,11 @@ class MovieService {
       Uri.parse('$_baseUrl/trending/movie/week?language=fr-FR'),
       headers: _headers,
     );
-
     if (response.statusCode != 200) {
       throw Exception('Impossible de charger les films tendance.');
     }
-
     final data = jsonDecode(response.body);
-    final List results = data['results'];
-    return results.map((e) => Movie.fromJson(e)).toList();
+    return (data['results'] as List).map((e) => Movie.fromJson(e)).toList();
   }
 
   Future<Movie> getMovieDetails(int movieId) async {
@@ -39,11 +36,9 @@ class MovieService {
       Uri.parse('$_baseUrl/movie/$movieId?language=fr-FR'),
       headers: _headers,
     );
-
     if (response.statusCode != 200) {
       throw Exception('Impossible de charger les détails du film.');
     }
-
     return Movie.fromJson(jsonDecode(response.body));
   }
 
@@ -52,12 +47,9 @@ class MovieService {
       Uri.parse('$_baseUrl/movie/$movieId/videos?language=fr-FR'),
       headers: _headers,
     );
-
     if (response.statusCode != 200) return [];
-
     final data = jsonDecode(response.body);
-    final List results = data['results'];
-    return results
+    return (data['results'] as List)
         .map((e) => MovieVideo.fromJson(e))
         .where((v) => v.site == 'YouTube')
         .toList();
@@ -68,14 +60,42 @@ class MovieService {
       Uri.parse('$_baseUrl/movie/$movieId/images'),
       headers: _headers,
     );
-
     if (response.statusCode != 200) return [];
-
     final data = jsonDecode(response.body);
-    final List backdrops = data['backdrops'] ?? [];
-    return backdrops
+    return (data['backdrops'] as List? ?? [])
         .take(10)
         .map((e) => MovieImage.fromJson(e))
+        .toList();
+  }
+
+  Future<Map<String, dynamic>> getMovieCredits(int movieId) async {
+    final response = await http.get(
+      Uri.parse('$_baseUrl/movie/$movieId/credits?language=fr-FR'),
+      headers: _headers,
+    );
+    if (response.statusCode != 200) return {'cast': [], 'crew': []};
+    final data = jsonDecode(response.body);
+    final cast = (data['cast'] as List)
+        .take(10)
+        .map((e) => CastMember.fromJson(e))
+        .toList();
+    final crew = (data['crew'] as List)
+        .map((e) => CrewMember.fromJson(e))
+        .where((c) => c.job == 'Director')
+        .toList();
+    return {'cast': cast, 'crew': crew};
+  }
+
+  Future<List<Movie>> getSimilarMovies(int movieId) async {
+    final response = await http.get(
+      Uri.parse('$_baseUrl/movie/$movieId/similar?language=fr-FR'),
+      headers: _headers,
+    );
+    if (response.statusCode != 200) return [];
+    final data = jsonDecode(response.body);
+    return (data['results'] as List)
+        .take(10)
+        .map((e) => Movie.fromJson(e))
         .toList();
   }
 }

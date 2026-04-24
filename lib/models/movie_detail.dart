@@ -32,3 +32,35 @@ class MovieImage {
 
   String get imageUrl => 'https://image.tmdb.org/t/p/w780$filePath';
 }
+
+class CastMember {
+  final String name;
+  final String character;
+  final String profilePath;
+
+  CastMember({
+    required this.name,
+    required this.character,
+    required this.profilePath,
+  });
+
+  factory CastMember.fromJson(Map<String, dynamic> json) => CastMember(
+    name: json['name'] ?? '',
+    character: json['character'] ?? '',
+    profilePath: json['profile_path'] ?? '',
+  );
+
+  String get profileUrl => 'https://image.tmdb.org/t/p/w185$profilePath';
+}
+
+class CrewMember {
+  final String name;
+  final String job;
+
+  CrewMember({required this.name, required this.job});
+
+  factory CrewMember.fromJson(Map<String, dynamic> json) => CrewMember(
+    name: json['name'] ?? '',
+    job: json['job'] ?? '',
+  );
+}
