@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/movie.dart';
 import '../models/movie_detail.dart';
+import '../models/user_movie_action.dart';
+import '../services/movie_action_service.dart';
 import '../services/movie_service.dart';
 import '../widgets/image_gallery_viewer.dart';
+import '../widgets/rating_bottom_sheet.dart';
 
 class MovieDetailPage extends StatefulWidget {
   final Movie movie;
@@ -15,6 +18,7 @@ class MovieDetailPage extends StatefulWidget {
 }
 
 class _MovieDetailPageState extends State<MovieDetailPage> {
+  UserMovieAction? _userAction;
   Movie? _details;
   List<MovieVideo> _videos = [];
   List<MovieImage> _images = [];
@@ -40,6 +44,8 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
         MovieService().getSimilarMovies(id),
       ]);
 
+      final userAction = MovieActionService().getAction(id);
+
       setState(() {
         _details = results[0] as Movie;
         _videos = results[1] as List<MovieVideo>;
@@ -48,6 +54,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
         _cast = credits['cast'] as List<CastMember>;
         _directors = credits['crew'] as List<CrewMember>;
         _similar = results[4] as List<Movie>;
+        _userAction = userAction;
         _isLoading = false;
       });
     } catch (e) {
@@ -60,6 +67,41 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
+  }
+
+  Future<void> _openRatingSheet() async {
+    final int movieId = (_details ?? widget.movie).id;
+    final String movieTitle = (_details ?? widget.movie).title;
+    final String moviePoster = (_details ?? widget.movie).posterPath;
+    final double? currentRating = _userAction?.rating;
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => RatingBottomSheet(
+        initialRating: currentRating,
+        onRate: (rating) {
+          MovieActionService().rateMovie(movieId, movieTitle, moviePoster, rating);
+          final updated = MovieActionService().getAction(movieId);
+          if (mounted) setState(() => _userAction = updated);
+        },
+        onRemove: () {
+          MovieActionService().removeRating(movieId);
+          final updated = MovieActionService().getAction(movieId);
+          if (mounted) setState(() => _userAction = updated);
+        },
+      ),
+    );
+  }
+
+  Future<void> _toggleWatchLater() async {
+    final int movieId = (_details ?? widget.movie).id;
+    final String movieTitle = (_details ?? widget.movie).title;
+    final String moviePoster = (_details ?? widget.movie).posterPath;
+
+    MovieActionService().toggleWatchLater(movieId, movieTitle, moviePoster);
+    final updated = MovieActionService().getAction(movieId);
+    if (mounted) setState(() => _userAction = updated);
   }
 
   @override
@@ -146,6 +188,96 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                           .toList(),
                     ),
                   ],
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: _openRatingSheet,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            decoration: BoxDecoration(
+                              color: _userAction?.rating != null
+                                  ? Colors.white
+                                  : const Color(0xFF1A1A1A),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFF2A2A2A)),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  _userAction?.rating != null
+                                      ? Icons.star_rounded
+                                      : Icons.star_outline_rounded,
+                                  color: _userAction?.rating != null
+                                      ? Colors.black
+                                      : Colors.white,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _userAction?.rating != null
+                                      ? '${_userAction!.rating!.toInt()} / 10'
+                                      : 'Noter',
+                                  style: TextStyle(
+                                    color: _userAction?.rating != null
+                                        ? Colors.black
+                                        : Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: _toggleWatchLater,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            decoration: BoxDecoration(
+                              color: (_userAction?.watchLater ?? false)
+                                  ? Colors.white
+                                  : const Color(0xFF1A1A1A),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFF2A2A2A)),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  (_userAction?.watchLater ?? false)
+                                      ? Icons.bookmark_rounded
+                                      : Icons.bookmark_outline_rounded,
+                                  color: (_userAction?.watchLater ?? false)
+                                      ? Colors.black
+                                      : Colors.white,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  (_userAction?.watchLater ?? false)
+                                      ? 'Sauvegardé'
+                                      : 'Voir plus tard',
+                                  style: TextStyle(
+                                    color: (_userAction?.watchLater ?? false)
+                                        ? Colors.black
+                                        : Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                   if (_directors.isNotEmpty) ...[
                     const SizedBox(height: 20),
                     Row(
@@ -332,7 +464,8 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                       MaterialPageRoute(
                         fullscreenDialog: true,
                         builder: (_) => ImageGalleryViewer(
-                          imageUrls: _images.map((img) => img.imageUrl).toList(),
+                          imageUrls:
+                          _images.map((img) => img.imageUrl).toList(),
                           initialIndex: index,
                         ),
                       ),

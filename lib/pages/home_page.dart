@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/movie.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
+import '../services/movie_action_service.dart';
 import '../services/movie_service.dart';
 import 'login_page.dart';
 import 'movie_detail_page.dart';
@@ -43,6 +44,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _logout(BuildContext context) async {
     await AuthService().logout();
+    MovieActionService().clearUser();
     if (!context.mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const LoginPage()),

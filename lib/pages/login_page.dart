@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../models/user.dart';
+import '../services/movie_action_service.dart';
 import 'home_page.dart';
 import 'register_page.dart';
 
@@ -58,6 +59,7 @@ class _LoginPageState extends State<LoginPage> {
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
+      MovieActionService().setUser(user.email);
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => HomePage(user: user)),

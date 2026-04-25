@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../services/movie_action_service.dart';
 import 'home_page.dart';
 import 'login_page.dart';
 
@@ -21,6 +22,9 @@ class _SplashPageState extends State<SplashPage> {
     await Future.delayed(const Duration(seconds: 2));
     final user = await AuthService().getCurrentUser();
     if (!mounted) return;
+    if (user != null) {
+      MovieActionService().setUser(user.email);
+    }
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (_) => user != null ? HomePage(user: user) : const LoginPage(),
