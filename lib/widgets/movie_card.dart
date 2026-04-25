@@ -10,49 +10,60 @@ class MovieCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => MovieDetailPage(movie: movie),
-        ),
-      ),
+      onTap: () async {
+        await precacheImage(NetworkImage(movie.posterUrl), context);
+        if (!context.mounted) return;
+
+        Navigator.of(context).push(
+          PageRouteBuilder(
+            pageBuilder: (_, __, ___) => MovieDetailPage(movie: movie),
+            transitionsBuilder: (_, anim, __, child) =>
+                FadeTransition(opacity: anim, child: child),
+            transitionDuration: const Duration(milliseconds: 350),
+          ),
+        );
+      },
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: movie.posterPath.isNotEmpty
-                  ? Image.network(
-                movie.posterUrl,
-                fit: BoxFit.cover,
-                width: double.infinity,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Container(
-                    color: const Color(0xFF1A1A1A),
-                    child: const Center(
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 1.5,
+            child: Hero(
+              tag: 'poster-${movie.id}',
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: movie.posterPath.isNotEmpty
+                    ? Image.network(
+                  movie.posterUrl,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
+                      color: const Color(0xFF1A1A1A),
+                      child: const Center(
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 1.5,
+                        ),
                       ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    color: const Color(0xFF1A1A1A),
+                    child: const Icon(
+                      Icons.movie,
+                      color: Color(0xFF333333),
+                      size: 40,
                     ),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) => Container(
+                  ),
+                )
+                    : Container(
                   color: const Color(0xFF1A1A1A),
                   child: const Icon(
                     Icons.movie,
                     color: Color(0xFF333333),
                     size: 40,
                   ),
-                ),
-              )
-                  : Container(
-                color: const Color(0xFF1A1A1A),
-                child: const Icon(
-                  Icons.movie,
-                  color: Color(0xFF333333),
-                  size: 40,
                 ),
               ),
             ),

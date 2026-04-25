@@ -584,43 +584,46 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
 
   Widget _buildAppBar(Movie movie) {
     return SliverAppBar(
-      expandedHeight: 480,
+      expandedHeight: 420,
       pinned: true,
       backgroundColor: Colors.black,
-      iconTheme: const IconThemeData(color: Colors.white),
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+        onPressed: () => Navigator.of(context).pop(),
+      ),
       flexibleSpace: FlexibleSpaceBar(
-        background: Stack(
-          fit: StackFit.expand,
-          children: [
-            movie.backdropPath.isNotEmpty
-                ? Image.network(
-              movie.backdropUrl,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => _posterFallback(movie),
-            )
-                : _posterFallback(movie),
-            Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, Colors.black],
-                  stops: [0.4, 1.0],
+        background: Hero(
+          tag: 'poster-${widget.movie.id}',
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              movie.posterPath.isNotEmpty
+                  ? Image.network(
+                movie.posterUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  color: const Color(0xFF1A1A1A),
+                ),
+              )
+                  : Container(color: const Color(0xFF1A1A1A)),
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black,
+                    ],
+                    stops: [0.5, 1.0],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _posterFallback(Movie movie) {
-    return movie.posterPath.isNotEmpty
-        ? Image.network(movie.posterUrl, fit: BoxFit.cover)
-        : Container(
-      color: const Color(0xFF1A1A1A),
-      child: const Icon(Icons.movie, color: Color(0xFF333333), size: 60),
-    );
-  }
 }
