@@ -81,7 +81,7 @@ class _ImageGalleryViewerState extends State<ImageGalleryViewer> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.55),
+                      color: Colors.black.withValues(alpha: 0.55),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -100,7 +100,7 @@ class _ImageGalleryViewerState extends State<ImageGalleryViewer> {
                       width: 38,
                       height: 38,
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.55),
+                        color: Colors.black.withValues(alpha: 0.55),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -132,7 +132,7 @@ class _ImageGalleryViewerState extends State<ImageGalleryViewer> {
                     decoration: BoxDecoration(
                       color: isActive
                           ? Colors.white
-                          : Colors.white.withOpacity(0.3),
+                          : Colors.white.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(3),
                     ),
                   );
