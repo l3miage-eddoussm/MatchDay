@@ -7,6 +7,7 @@ import '../services/movie_action_service.dart';
 import '../services/movie_service.dart';
 import '../widgets/image_gallery_viewer.dart';
 import '../widgets/rating_bottom_sheet.dart';
+import '../widgets/section_title.dart';
 
 class MovieDetailPage extends StatefulWidget {
   final Movie movie;
@@ -146,7 +147,10 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                       ),
                       const Text(
                         ' / 10',
-                        style: TextStyle(color: Color(0xFF666666), fontSize: 13),
+                        style: TextStyle(
+                          color: Color(0xFF666666),
+                          fontSize: 13,
+                        ),
                       ),
                       if (movie.releaseDate.isNotEmpty) ...[
                         const SizedBox(width: 16),
@@ -156,7 +160,9 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                         Text(
                           movie.releaseDate.substring(0, 4),
                           style: const TextStyle(
-                              color: Color(0xFF888888), fontSize: 13),
+                            color: Color(0xFF888888),
+                            fontSize: 13,
+                          ),
                         ),
                       ],
                     ],
@@ -201,7 +207,8 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                                   ? Colors.white
                                   : const Color(0xFF1A1A1A),
                               borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: const Color(0xFF2A2A2A)),
+                              border: Border.all(
+                                  color: const Color(0xFF2A2A2A)),
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -244,7 +251,8 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                                   ? Colors.white
                                   : const Color(0xFF1A1A1A),
                               borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: const Color(0xFF2A2A2A)),
+                              border: Border.all(
+                                  color: const Color(0xFF2A2A2A)),
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -326,7 +334,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
             ),
           ),
           if (_cast.isNotEmpty) ...[
-            _buildSectionTitle('Casting'),
+            SliverToBoxAdapter(child: SectionTitle(title: 'Casting')),
             SliverToBoxAdapter(
               child: SizedBox(
                 height: 160,
@@ -386,7 +394,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
             ),
           ],
           if (_videos.isNotEmpty) ...[
-            _buildSectionTitle('Videos'),
+            SliverToBoxAdapter(child: SectionTitle(title: 'Vidéos')),
             SliverToBoxAdapter(
               child: SizedBox(
                 height: 120,
@@ -450,7 +458,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
             ),
           ],
           if (_images.isNotEmpty) ...[
-            _buildSectionTitle('Images'),
+            SliverToBoxAdapter(child: SectionTitle(title: 'Images')),
             SliverToBoxAdapter(
               child: SizedBox(
                 height: 160,
@@ -464,8 +472,9 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                       MaterialPageRoute(
                         fullscreenDialog: true,
                         builder: (_) => ImageGalleryViewer(
-                          imageUrls:
-                          _images.map((img) => img.imageUrl).toList(),
+                          imageUrls: _images
+                              .map((img) => img.imageUrl)
+                              .toList(),
                           initialIndex: index,
                         ),
                       ),
@@ -490,7 +499,8 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
             ),
           ],
           if (_similar.isNotEmpty) ...[
-            _buildSectionTitle('Films similaires'),
+            SliverToBoxAdapter(
+                child: SectionTitle(title: 'Films similaires')),
             SliverToBoxAdapter(
               child: SizedBox(
                 height: 220,
@@ -502,11 +512,13 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                   itemBuilder: (context, index) {
                     final similar = _similar[index];
                     return GestureDetector(
-                      onTap: () => Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                          builder: (_) => MovieDetailPage(movie: similar),
-                        ),
-                      ),
+                      onTap: () =>
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  MovieDetailPage(movie: similar),
+                            ),
+                          ),
                       child: SizedBox(
                         width: 120,
                         child: Column(
@@ -557,23 +569,6 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
           ],
           const SliverToBoxAdapter(child: SizedBox(height: 40)),
         ],
-      ),
-    );
-  }
-
-  SliverToBoxAdapter _buildSectionTitle(String title) {
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 28, 20, 14),
-        child: Text(
-          title,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1,
-          ),
-        ),
       ),
     );
   }

@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
-import 'package:localstorage/localstorage.dart';
 import '../models/user.dart';
+import 'storage_service.dart';
 
 class AuthService {
   static final AuthService _instance = AuthService._internal();
@@ -23,7 +23,7 @@ class AuthService {
     required String email,
     required String password,
   }) async {
-    final existingRaw = localStorage.getItem(_usersKey);
+    final existingRaw = StorageService().getItem(_usersKey);
     final List<dynamic> users =
     existingRaw != null ? jsonDecode(existingRaw) : [];
 
@@ -40,14 +40,14 @@ class AuthService {
     );
 
     users.add(newUser.toJson());
-    localStorage.setItem(_usersKey, jsonEncode(users));
+    StorageService().setItem(_usersKey, jsonEncode(users));
   }
 
   Future<User> login({
     required String email,
     required String password,
   }) async {
-    final raw = localStorage.getItem(_usersKey);
+    final raw = StorageService().getItem(_usersKey);
     final List<dynamic> users = raw != null ? jsonDecode(raw) : [];
 
     final hash = _hashPassword(password);
@@ -61,17 +61,17 @@ class AuthService {
     }
 
     final user = User.fromJson(match);
-    localStorage.setItem(_currentUserKey, jsonEncode(user.toJson()));
+    StorageService().setItem(_currentUserKey, jsonEncode(user.toJson()));
     return user;
   }
 
   Future<User?> getCurrentUser() async {
-    final raw = localStorage.getItem(_currentUserKey);
+    final raw = StorageService().getItem(_currentUserKey);
     if (raw == null) return null;
     return User.fromJson(jsonDecode(raw));
   }
 
   Future<void> logout() async {
-    localStorage.removeItem(_currentUserKey);
+    StorageService().remove(_currentUserKey);
   }
 }

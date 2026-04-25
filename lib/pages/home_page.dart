@@ -4,8 +4,8 @@ import '../models/user.dart';
 import '../services/auth_service.dart';
 import '../services/movie_action_service.dart';
 import '../services/movie_service.dart';
+import '../widgets/movie_card.dart';
 import 'login_page.dart';
-import 'movie_detail_page.dart';
 
 class HomePage extends StatefulWidget {
   final User user;
@@ -80,7 +80,10 @@ class _HomePageState extends State<HomePage> {
       ),
       body: _isLoading
           ? const Center(
-        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+        child: CircularProgressIndicator(
+          color: Colors.white,
+          strokeWidth: 2,
+        ),
       )
           : _error != null
           ? Center(
@@ -88,7 +91,10 @@ class _HomePageState extends State<HomePage> {
           padding: const EdgeInsets.all(32),
           child: Text(
             _error!,
-            style: const TextStyle(color: Color(0xFFFF4444), fontSize: 14),
+            style: const TextStyle(
+              color: Color(0xFFFF4444),
+              fontSize: 14,
+            ),
             textAlign: TextAlign.center,
           ),
         ),
@@ -124,95 +130,19 @@ class _HomePageState extends State<HomePage> {
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
             sliver: SliverGrid(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              gridDelegate:
+              const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 16,
                 childAspectRatio: 0.58,
               ),
               delegate: SliverChildBuilderDelegate(
-                    (context, index) => _MovieCard(movie: _movies[index]),
+                    (context, index) =>
+                    MovieCard(movie: _movies[index]),
                 childCount: _movies.length,
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MovieCard extends StatelessWidget {
-  final Movie movie;
-
-  const _MovieCard({required this.movie});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => MovieDetailPage(movie: movie),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: movie.posterPath.isNotEmpty
-                  ? Image.network(
-                movie.posterUrl,
-                fit: BoxFit.cover,
-                width: double.infinity,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Container(
-                    color: const Color(0xFF1A1A1A),
-                    child: const Center(
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 1.5,
-                      ),
-                    ),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) => Container(
-                  color: const Color(0xFF1A1A1A),
-                  child: const Icon(Icons.movie, color: Color(0xFF333333), size: 40),
-                ),
-              )
-                  : Container(
-                color: const Color(0xFF1A1A1A),
-                child: const Icon(Icons.movie, color: Color(0xFF333333), size: 40),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            movie.title,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              const Icon(Icons.star, color: Colors.white, size: 12),
-              const SizedBox(width: 4),
-              Text(
-                movie.voteAverage.toStringAsFixed(1),
-                style: const TextStyle(
-                  color: Color(0xFF888888),
-                  fontSize: 12,
-                ),
-              ),
-            ],
           ),
         ],
       ),

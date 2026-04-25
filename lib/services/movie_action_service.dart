@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'package:localstorage/localstorage.dart';
 import '../models/user_movie_action.dart';
+import 'storage_service.dart';
 
 class MovieActionService {
   static final MovieActionService _instance = MovieActionService._internal();
@@ -27,7 +27,7 @@ class MovieActionService {
   }
 
   Map<int, UserMovieAction> _getAll() {
-    final raw = localStorage.getItem(_storageKey);
+    final raw = StorageService().getItem(_storageKey);
     if (raw == null) return {};
     final decoded = jsonDecode(raw) as Map<String, dynamic>;
     return decoded.map(
@@ -39,7 +39,7 @@ class MovieActionService {
     final encoded = jsonEncode(
       actions.map((k, v) => MapEntry(k.toString(), v.toJson())),
     );
-    localStorage.setItem(_storageKey, encoded);
+    StorageService().setItem(_storageKey, encoded);
   }
 
   UserMovieAction? getAction(int movieId) {

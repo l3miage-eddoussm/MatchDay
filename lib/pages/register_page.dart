@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../widgets/error_list.dart';
 import 'login_page.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -29,20 +30,13 @@ class _RegisterPageState extends State<RegisterPage> {
     final password = _passwordController.text;
     final List<String> errors = [];
 
-    if (firstName.isEmpty) {
-      errors.add('Le champ prénom est obligatoire.');
-    }
-
-    if (lastName.isEmpty) {
-      errors.add('Le champ nom est obligatoire.');
-    }
-
+    if (firstName.isEmpty) errors.add('Le champ prénom est obligatoire.');
+    if (lastName.isEmpty) errors.add('Le champ nom est obligatoire.');
     if (email.isEmpty) {
       errors.add('Le champ email est obligatoire.');
     } else if (!_isValidEmail(email)) {
       errors.add('Adresse email invalide.');
     }
-
     if (password.isEmpty) {
       errors.add('Le champ mot de passe est obligatoire.');
     } else if (password.length < 8) {
@@ -112,7 +106,11 @@ class _RegisterPageState extends State<RegisterPage> {
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(Icons.movie_filter, color: Colors.black, size: 40),
+                      child: const Icon(
+                        Icons.movie_filter,
+                        color: Colors.black,
+                        size: 40,
+                      ),
                     ),
                     const SizedBox(height: 14),
                     const Text(
@@ -169,7 +167,10 @@ class _RegisterPageState extends State<RegisterPage> {
                 decoration: const InputDecoration(
                   labelText: 'Mot de passe',
                   helperText: 'Minimum 8 caracteres',
-                  helperStyle: TextStyle(color: Color(0xFF666666), fontSize: 12),
+                  helperStyle: TextStyle(
+                    color: Color(0xFF666666),
+                    fontSize: 12,
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -191,53 +192,14 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                   ),
                 ),
-              if (_errors.isNotEmpty)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2B0D0D),
-                    border: Border.all(color: const Color(0xFF7D2E2E)),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: _errors
-                        .map(
-                          (e) => Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              '- ',
-                              style: TextStyle(
-                                color: Color(0xFFFF4444),
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            Expanded(
-                              child: Text(
-                                e,
-                                style: const TextStyle(
-                                  color: Color(0xFFFF4444),
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                        .toList(),
-                  ),
-                ),
+              ErrorList(errors: _errors),
               const SizedBox(height: 28),
               _isLoading
                   ? const Center(
-                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
               )
                   : ElevatedButton(
                 onPressed: _success ? null : _register,

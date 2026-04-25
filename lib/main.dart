@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:localstorage/localstorage.dart';
 import 'pages/splash_page.dart';
+import 'services/storage_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await initLocalStorage();
+  await StorageService().init();
   runApp(const CineArtApp());
 }
 

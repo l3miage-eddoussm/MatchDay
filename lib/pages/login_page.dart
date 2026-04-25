@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../models/user.dart';
 import '../services/movie_action_service.dart';
+import '../widgets/error_list.dart';
 import 'home_page.dart';
 import 'register_page.dart';
 
@@ -90,7 +91,11 @@ class _LoginPageState extends State<LoginPage> {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: const Icon(Icons.movie_filter, color: Colors.black, size: 52),
+                  child: const Icon(
+                    Icons.movie_filter,
+                    color: Colors.black,
+                    size: 52,
+                  ),
                 ),
                 const SizedBox(height: 20),
                 const Text(
@@ -123,55 +128,17 @@ class _LoginPageState extends State<LoginPage> {
                   controller: _passwordController,
                   obscureText: true,
                   style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(labelText: 'Mot de passe'),
+                  decoration:
+                  const InputDecoration(labelText: 'Mot de passe'),
                 ),
                 const SizedBox(height: 16),
-                if (_errors.isNotEmpty)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2B0D0D),
-                      border: Border.all(color: const Color(0xFF7D2E2E)),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: _errors
-                          .map(
-                            (e) => Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                '- ',
-                                style: TextStyle(
-                                  color: Color(0xFFFF4444),
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              Expanded(
-                                child: Text(
-                                  e,
-                                  style: const TextStyle(
-                                    color: Color(0xFFFF4444),
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      )
-                          .toList(),
-                    ),
-                  ),
+                ErrorList(errors: _errors),
                 const SizedBox(height: 24),
                 _isLoading
-                    ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                    ? const CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                )
                     : ElevatedButton(
                   onPressed: _login,
                   child: const Text(
