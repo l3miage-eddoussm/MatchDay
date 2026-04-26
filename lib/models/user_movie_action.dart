@@ -4,6 +4,7 @@ class UserMovieAction {
   final String posterPath;
   final double? rating;
   final bool watchLater;
+  static const _undefined = Object();
 
   UserMovieAction({
     required this.movieId,
@@ -30,14 +31,14 @@ class UserMovieAction {
   };
 
   UserMovieAction copyWith({
-    double? rating,
+    Object? rating = _undefined,
     bool? watchLater,
   }) =>
       UserMovieAction(
         movieId: movieId,
         movieTitle: movieTitle,
         posterPath: posterPath,
-        rating: rating ?? this.rating,
+        rating: identical(rating, _undefined) ? this.rating : rating as double?,
         watchLater: watchLater ?? this.watchLater,
       );
 }
