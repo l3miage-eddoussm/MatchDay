@@ -98,4 +98,45 @@ class MovieService {
         .map((e) => Movie.fromJson(e))
         .toList();
   }
+  Future<List<Movie>> getNowPlayingMovies() async {
+    final response = await http.get(
+      Uri.parse('$_baseUrl/movie/now_playing?language=fr-FR'),
+      headers: _headers,
+    );
+    if (response.statusCode != 200) throw Exception('Impossible de charger les films.');
+    final data = jsonDecode(response.body);
+    return (data['results'] as List).map((e) => Movie.fromJson(e)).toList();
+  }
+
+  Future<List<Movie>> getTopRatedMovies() async {
+    final response = await http.get(
+      Uri.parse('$_baseUrl/movie/top_rated?language=fr-FR'),
+      headers: _headers,
+    );
+    if (response.statusCode != 200) throw Exception('Impossible de charger les films.');
+    final data = jsonDecode(response.body);
+    return (data['results'] as List).map((e) => Movie.fromJson(e)).toList();
+  }
+
+  Future<List<Movie>> getUpcomingMovies() async {
+    final response = await http.get(
+      Uri.parse('$_baseUrl/movie/upcoming?language=fr-FR'),
+      headers: _headers,
+    );
+    if (response.statusCode != 200) throw Exception('Impossible de charger les films.');
+    final data = jsonDecode(response.body);
+    return (data['results'] as List).map((e) => Movie.fromJson(e)).toList();
+  }
+
+  Future<List<Movie>> getMoviesByGenre(int genreId) async {
+    final response = await http.get(
+      Uri.parse(
+        '$_baseUrl/discover/movie?language=fr-FR&with_genres=$genreId&sort_by=popularity.desc',
+      ),
+      headers: _headers,
+    );
+    if (response.statusCode != 200) return [];
+    final data = jsonDecode(response.body);
+    return (data['results'] as List).map((e) => Movie.fromJson(e)).toList();
+  }
 }
