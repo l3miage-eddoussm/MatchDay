@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../models/movie.dart';
 import '../constants.dart';
 import 'movie_detail_page.dart';
+import 'person_page.dart';
 
 enum _ResultType { movie, person }
 
@@ -104,12 +105,10 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   Future<void> _loadGenres() async {
-    final uri = Uri.parse(
-      '${AppConstants.tmdbBaseUrl}/genre/movie/list?language=fr-FR',
+    final response = await http.get(
+      Uri.parse('${AppConstants.tmdbBaseUrl}/genre/movie/list?language=fr-FR'),
+      headers: {'Authorization': 'Bearer ${AppConstants.tmdbToken}'},
     );
-    final response = await http.get(uri, headers: {
-      'Authorization': 'Bearer ${AppConstants.tmdbToken}',
-    });
     if (!mounted) return;
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
@@ -159,9 +158,10 @@ class _SearchPageState extends State<SearchPage> {
           '&language=fr-FR'
           '&include_adult=false',
     );
-    final response = await http.get(uri, headers: {
-      'Authorization': 'Bearer ${AppConstants.tmdbToken}',
-    });
+    final response = await http.get(
+      uri,
+      headers: {'Authorization': 'Bearer ${AppConstants.tmdbToken}'},
+    );
     if (response.statusCode != 200) return (<_SearchResult>[], 0);
     final data = jsonDecode(response.body);
     final results = <_SearchResult>[];
@@ -195,9 +195,10 @@ class _SearchPageState extends State<SearchPage> {
     if (_selectedYear != null) {
       buffer.write('&primary_release_year=$_selectedYear');
     }
-    final response = await http.get(Uri.parse(buffer.toString()), headers: {
-      'Authorization': 'Bearer ${AppConstants.tmdbToken}',
-    });
+    final response = await http.get(
+      Uri.parse(buffer.toString()),
+      headers: {'Authorization': 'Bearer ${AppConstants.tmdbToken}'},
+    );
     if (response.statusCode != 200) return (<_SearchResult>[], 0);
     final data = jsonDecode(response.body);
     final results = (data['results'] as List)
@@ -345,7 +346,9 @@ class _SearchPageState extends State<SearchPage> {
               width: 50,
               height: 50,
               decoration: BoxDecoration(
-                color: _hasActiveFilters ? Colors.white : const Color(0xFF1E1E1E),
+                color: _hasActiveFilters
+                    ? Colors.white
+                    : const Color(0xFF1E1E1E),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
                   color: _hasActiveFilters ? Colors.white : Colors.white10,
@@ -403,7 +406,8 @@ class _SearchPageState extends State<SearchPage> {
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
       child: Row(
         children: [
-          const Icon(Icons.filter_list_rounded, size: 14, color: Colors.white38),
+          const Icon(Icons.filter_list_rounded,
+              size: 14, color: Colors.white38),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
@@ -432,7 +436,8 @@ class _SearchPageState extends State<SearchPage> {
   Widget _buildBody() {
     if (_isLoading) {
       return const Center(
-        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+        child:
+        CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
       );
     }
 
@@ -441,7 +446,8 @@ class _SearchPageState extends State<SearchPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.search_off_rounded, size: 64, color: Colors.white12),
+            const Icon(Icons.search_off_rounded,
+                size: 64, color: Colors.white12),
             const SizedBox(height: 16),
             Text(
               _searchController.text.isNotEmpty
@@ -567,78 +573,88 @@ class _SearchPageState extends State<SearchPage> {
         ? 'Acteur'
         : dept;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white10),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            flex: 65,
-            child: hasPhoto
-                ? Image.network(
-              '${AppConstants.tmdbImageBaseUrl}/w342${person.profilePath}',
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => _personPlaceholder(),
-            )
-                : _personPlaceholder(),
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => PersonPage(
+            personId: person.id,
+            personName: person.name,
           ),
-          Expanded(
-            flex: 35,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (label.isNotEmpty)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 5),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 7, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.white12,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        label,
-                        style: const TextStyle(
-                          color: Colors.white60,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 0.4,
+        ),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1E1E),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white10),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              flex: 65,
+              child: hasPhoto
+                  ? Image.network(
+                '${AppConstants.tmdbImageBaseUrl}/w342${person.profilePath}',
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _personPlaceholder(),
+              )
+                  : _personPlaceholder(),
+            ),
+            Expanded(
+              flex: 35,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (label.isNotEmpty)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 5),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.white12,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          label,
+                          style: const TextStyle(
+                            color: Colors.white60,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: 0.4,
+                          ),
                         ),
                       ),
-                    ),
-                  Text(
-                    person.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  if (person.knownForTitles.isNotEmpty) ...[
-                    const SizedBox(height: 3),
                     Text(
-                      person.knownForTitles.join(', '),
+                      person.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style:
-                      const TextStyle(color: Colors.white38, fontSize: 10),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
+                    if (person.knownForTitles.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        person.knownForTitles.join(', '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: Colors.white38, fontSize: 10),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -646,7 +662,8 @@ class _SearchPageState extends State<SearchPage> {
   Widget _personPlaceholder() {
     return Container(
       color: const Color(0xFF2A2A2A),
-      child: const Icon(Icons.person_rounded, color: Colors.white12, size: 48),
+      child: const Icon(Icons.person_rounded,
+          color: Colors.white12, size: 48),
     );
   }
 
@@ -760,7 +777,9 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                   ),
                   const SizedBox(height: 28),
                   _buildSection(
-                    _year != null ? 'Année : $_year' : 'Année : toutes',
+                    _year != null
+                        ? 'Année : $_year'
+                        : 'Année : toutes',
                     _buildYearSlider(),
                   ),
                   const SizedBox(height: 32),
@@ -787,7 +806,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                   ),
                   child: const Text(
                     'Appliquer les filtres',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
@@ -822,7 +842,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
       return const SizedBox(
         height: 24,
         child: Center(
-          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+          child: CircularProgressIndicator(
+              color: Colors.white, strokeWidth: 2),
         ),
       );
     }
@@ -843,7 +864,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
           }),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            padding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
               color: isSelected ? Colors.white : const Color(0xFF2A2A2A),
               borderRadius: BorderRadius.circular(20),
@@ -856,7 +878,9 @@ class _FiltersSheetState extends State<_FiltersSheet> {
               style: TextStyle(
                 color: isSelected ? Colors.black : Colors.white54,
                 fontSize: 13,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                fontWeight: isSelected
+                    ? FontWeight.w600
+                    : FontWeight.normal,
               ),
             ),
           ),
@@ -875,7 +899,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
             overlayColor: Colors.white12,
             inactiveTrackColor: Colors.white12,
             trackHeight: 3,
-            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+            thumbShape:
+            const RoundSliderThumbShape(enabledThumbRadius: 8),
           ),
           child: Slider(
             value: _rating,
@@ -911,14 +936,16 @@ class _FiltersSheetState extends State<_FiltersSheet> {
             overlayColor: Colors.white12,
             inactiveTrackColor: Colors.white12,
             trackHeight: 3,
-            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+            thumbShape:
+            const RoundSliderThumbShape(enabledThumbRadius: 8),
           ),
           child: Slider(
             value: (_year ?? _currentYear).toDouble(),
             min: 1950,
             max: _currentYear.toDouble(),
             divisions: _currentYear - 1950,
-            onChanged: (value) => setState(() => _year = value.toInt()),
+            onChanged: (value) =>
+                setState(() => _year = value.toInt()),
           ),
         ),
         Padding(
@@ -941,7 +968,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
               ),
               Text(
                 '$_currentYear',
-                style: const TextStyle(color: Colors.white38, fontSize: 11),
+                style: const TextStyle(
+                    color: Colors.white38, fontSize: 11),
               ),
             ],
           ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/movie.dart';
 import '../models/movie_detail.dart';
+import '../pages/person_page.dart';
 
 class MovieInfoHeader extends StatelessWidget {
   final Movie movie;
@@ -48,7 +49,9 @@ class MovieInfoHeader extends StatelessWidget {
                   color: Color(0xFF666666), size: 13),
               const SizedBox(width: 5),
               Text(
-                movie.releaseDate.substring(0, 4),
+                movie.releaseDate.length >= 4
+                    ? movie.releaseDate.substring(0, 4)
+                    : movie.releaseDate,
                 style: const TextStyle(
                     color: Color(0xFF888888), fontSize: 13),
               ),
@@ -82,17 +85,40 @@ class MovieInfoHeader extends StatelessWidget {
         if (directors.isNotEmpty) ...[
           const SizedBox(height: 20),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const Text(
                 'Réalisateur : ',
                 style: TextStyle(color: Color(0xFF888888), fontSize: 14),
               ),
-              Text(
-                directors.map((d) => d.name).join(', '),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
+              Expanded(
+                child: Wrap(
+                  spacing: 6,
+                  children: directors
+                      .where((d) => d.name.isNotEmpty)
+                      .map(
+                        (d) => GestureDetector(
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => PersonPage(
+                            personId: d.id,
+                            personName: d.name,
+                          ),
+                        ),
+                      ),
+                      child: Text(
+                        d.name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          decoration: TextDecoration.underline,
+                          decorationColor: Color(0xFF7C3AED),
+                        ),
+                      ),
+                    ),
+                  )
+                      .toList(),
                 ),
               ),
             ],

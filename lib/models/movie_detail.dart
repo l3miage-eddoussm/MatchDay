@@ -34,17 +34,20 @@ class MovieImage {
 }
 
 class CastMember {
+  final int id;
   final String name;
   final String character;
   final String profilePath;
 
   CastMember({
+    required this.id,
     required this.name,
     required this.character,
     required this.profilePath,
   });
 
   factory CastMember.fromJson(Map<String, dynamic> json) => CastMember(
+    id: json['id'] ?? 0,
     name: json['name'] ?? '',
     character: json['character'] ?? '',
     profilePath: json['profile_path'] ?? '',
@@ -54,12 +57,14 @@ class CastMember {
 }
 
 class CrewMember {
+  final int id;
   final String name;
   final String job;
 
-  CrewMember({required this.name, required this.job});
+  CrewMember({required this.id,required this.name, required this.job});
 
   factory CrewMember.fromJson(Map<String, dynamic> json) => CrewMember(
+    id: json['id'] ?? 0,
     name: json['name'] ?? '',
     job: json['job'] ?? '',
   );

@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import '../constants.dart';
 import '../models/movie.dart';
 import '../models/movie_detail.dart';
+import '../models/person.dart';
 
 class MovieService {
   static final MovieService _instance = MovieService._internal();
@@ -133,5 +134,54 @@ class MovieService {
     if (response.statusCode != 200) return [];
     final data = jsonDecode(response.body);
     return (data['results'] as List).map((e) => Movie.fromJson(e)).toList();
+  }
+  Future<Person> getPersonDetails(int personId) async {
+    final results = await Future.wait([
+      http.get(
+        Uri.parse('${AppConstants.tmdbBaseUrl}/person/$personId?language=fr-FR'),
+        headers: _headers,
+      ),
+      http.get(
+        Uri.parse('${AppConstants.tmdbBaseUrl}/person/$personId/movie_credits?language=fr-FR'),
+        headers: _headers,
+      ),
+    ]);
+
+    if (results[0].statusCode != 200) {
+      throw Exception('Impossible de charger les détails de la personne.');
+    }
+
+    final details = jsonDecode(results[0].body) as Map<String, dynamic>;
+    List<PersonMovie> acting = [];
+    List<PersonMovie> directing = [];
+
+    if (results[1].statusCode == 200) {
+      final credits = jsonDecode(results[1].body);
+      acting = ((credits['cast'] as List?) ?? [])
+          .map((e) => PersonMovie.fromJson(e))
+          .where((m) => m.title.isNotEmpty)
+          .toList()
+        ..sort((a, b) => b.voteAverage.compareTo(a.voteAverage));
+      directing = ((credits['crew'] as List?) ?? [])
+          .where((e) => e['job'] == 'Director')
+          .map((e) => PersonMovie.fromJson(e))
+          .where((m) => m.title.isNotEmpty)
+          .toList()
+        ..sort((a, b) => b.voteAverage.compareTo(a.voteAverage));
+    }
+
+    return Person.fromJson(details, acting, directing);
+  }
+
+  Future<List<Map<String, dynamic>>> searchPeople(String query) async {
+    if (query.trim().isEmpty) return [];
+    final response = await http.get(
+      Uri.parse(
+          '${AppConstants.tmdbBaseUrl}/search/person?query=${Uri.encodeComponent(query)}&language=fr-FR'),
+      headers: _headers,
+    );
+    if (response.statusCode != 200) return [];
+    final data = jsonDecode(response.body);
+    return List<Map<String, dynamic>>.from(data['results'] ?? []);
   }
 }
