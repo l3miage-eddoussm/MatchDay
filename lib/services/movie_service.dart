@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../constants.dart';
 import '../models/movie.dart';
 import '../models/movie_detail.dart';
 
@@ -10,18 +11,14 @@ class MovieService {
 
   MovieService._internal();
 
-  static const String _baseUrl = 'https://api.themoviedb.org/3';
-  static const String _token =
-      'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzNDkyZTZiNjZhOTI0ODNjMmY5YWJmNDAwNTFmODMzOSIsIm5iZiI6MTc3Njk0ODA4OC4zMzcsInN1YiI6IjY5ZWExMzc4NDQwMWM5OTc4M2JiMWUwNiIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.nyKxwD7R4acO09pye2wAfNQ8nQbKhZ7pYbv72l3blrY';
-
   Map<String, String> get _headers => {
-    'Authorization': 'Bearer $_token',
+    'Authorization': 'Bearer ${AppConstants.tmdbToken}',
     'Content-Type': 'application/json',
   };
 
   Future<List<Movie>> getTrendingMovies() async {
     final response = await http.get(
-      Uri.parse('$_baseUrl/trending/movie/week?language=fr-FR'),
+      Uri.parse('${AppConstants.tmdbBaseUrl}/trending/movie/week?language=fr-FR'),
       headers: _headers,
     );
     if (response.statusCode != 200) {
@@ -33,7 +30,7 @@ class MovieService {
 
   Future<Movie> getMovieDetails(int movieId) async {
     final response = await http.get(
-      Uri.parse('$_baseUrl/movie/$movieId?language=fr-FR'),
+      Uri.parse('${AppConstants.tmdbBaseUrl}/movie/$movieId?language=fr-FR'),
       headers: _headers,
     );
     if (response.statusCode != 200) {
@@ -44,7 +41,7 @@ class MovieService {
 
   Future<List<MovieVideo>> getMovieVideos(int movieId) async {
     final response = await http.get(
-      Uri.parse('$_baseUrl/movie/$movieId/videos?language=fr-FR'),
+      Uri.parse('${AppConstants.tmdbBaseUrl}/movie/$movieId/videos?language=fr-FR'),
       headers: _headers,
     );
     if (response.statusCode != 200) return [];
@@ -57,7 +54,7 @@ class MovieService {
 
   Future<List<MovieImage>> getMovieImages(int movieId) async {
     final response = await http.get(
-      Uri.parse('$_baseUrl/movie/$movieId/images'),
+      Uri.parse('${AppConstants.tmdbBaseUrl}/movie/$movieId/images'),
       headers: _headers,
     );
     if (response.statusCode != 200) return [];
@@ -70,7 +67,7 @@ class MovieService {
 
   Future<Map<String, dynamic>> getMovieCredits(int movieId) async {
     final response = await http.get(
-      Uri.parse('$_baseUrl/movie/$movieId/credits?language=fr-FR'),
+      Uri.parse('${AppConstants.tmdbBaseUrl}/movie/$movieId/credits?language=fr-FR'),
       headers: _headers,
     );
     if (response.statusCode != 200) return {'cast': [], 'crew': []};
@@ -88,19 +85,17 @@ class MovieService {
 
   Future<List<Movie>> getSimilarMovies(int movieId) async {
     final response = await http.get(
-      Uri.parse('$_baseUrl/movie/$movieId/similar?language=fr-FR'),
+      Uri.parse('${AppConstants.tmdbBaseUrl}/movie/$movieId/similar?language=fr-FR'),
       headers: _headers,
     );
     if (response.statusCode != 200) return [];
     final data = jsonDecode(response.body);
-    return (data['results'] as List)
-        .take(10)
-        .map((e) => Movie.fromJson(e))
-        .toList();
+    return (data['results'] as List).take(10).map((e) => Movie.fromJson(e)).toList();
   }
+
   Future<List<Movie>> getNowPlayingMovies() async {
     final response = await http.get(
-      Uri.parse('$_baseUrl/movie/now_playing?language=fr-FR'),
+      Uri.parse('${AppConstants.tmdbBaseUrl}/movie/now_playing?language=fr-FR'),
       headers: _headers,
     );
     if (response.statusCode != 200) throw Exception('Impossible de charger les films.');
@@ -110,7 +105,7 @@ class MovieService {
 
   Future<List<Movie>> getTopRatedMovies() async {
     final response = await http.get(
-      Uri.parse('$_baseUrl/movie/top_rated?language=fr-FR'),
+      Uri.parse('${AppConstants.tmdbBaseUrl}/movie/top_rated?language=fr-FR'),
       headers: _headers,
     );
     if (response.statusCode != 200) throw Exception('Impossible de charger les films.');
@@ -120,7 +115,7 @@ class MovieService {
 
   Future<List<Movie>> getUpcomingMovies() async {
     final response = await http.get(
-      Uri.parse('$_baseUrl/movie/upcoming?language=fr-FR'),
+      Uri.parse('${AppConstants.tmdbBaseUrl}/movie/upcoming?language=fr-FR'),
       headers: _headers,
     );
     if (response.statusCode != 200) throw Exception('Impossible de charger les films.');
@@ -131,7 +126,7 @@ class MovieService {
   Future<List<Movie>> getMoviesByGenre(int genreId) async {
     final response = await http.get(
       Uri.parse(
-        '$_baseUrl/discover/movie?language=fr-FR&with_genres=$genreId&sort_by=popularity.desc',
+        '${AppConstants.tmdbBaseUrl}/discover/movie?language=fr-FR&with_genres=$genreId&sort_by=popularity.desc',
       ),
       headers: _headers,
     );

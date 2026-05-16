@@ -25,7 +25,7 @@ class Movie {
     overview: json['overview'] ?? '',
     posterPath: json['poster_path'] ?? '',
     backdropPath: json['backdrop_path'] ?? '',
-    voteAverage: (json['vote_average'] as num).toDouble(),
+      voteAverage: (json['vote_average'] as num?)?.toDouble() ?? 0.0,
     releaseDate: json['release_date'] ?? '',
     genres: json['genres'] != null
         ? List<String>.from(

@@ -19,6 +19,15 @@ class _RegisterPageState extends State<RegisterPage> {
   List<String> _errors = [];
   bool _success = false;
 
+  @override
+  void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
   bool _isValidEmail(String email) {
     return RegExp(r'^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
   }

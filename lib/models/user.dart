@@ -4,6 +4,7 @@ class User {
   final String email;
   final String passwordHash;
 
+
   User({
     required this.firstName,
     required this.lastName,

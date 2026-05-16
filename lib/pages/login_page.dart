@@ -19,6 +19,13 @@ class _LoginPageState extends State<LoginPage> {
   bool _isLoading = false;
   List<String> _errors = [];
 
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
   bool _isValidEmail(String email) {
     return RegExp(r'^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
   }
@@ -128,8 +135,7 @@ class _LoginPageState extends State<LoginPage> {
                   controller: _passwordController,
                   obscureText: true,
                   style: const TextStyle(color: Colors.white),
-                  decoration:
-                  const InputDecoration(labelText: 'Mot de passe'),
+                  decoration: const InputDecoration(labelText: 'Mot de passe'),
                 ),
                 const SizedBox(height: 16),
                 ErrorList(errors: _errors),

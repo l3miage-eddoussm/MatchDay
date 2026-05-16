@@ -9,6 +9,7 @@ import '../services/movie_action_service.dart';
 import '../services/movie_service.dart';
 import 'login_page.dart';
 import 'movie_detail_page.dart';
+import 'search_page.dart';
 
 const List<Map<String, dynamic>> _kGenres = [
   {'id': 28,    'name': 'Action'},
@@ -207,8 +208,19 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
       actions: [
+        IconButton(
+          icon: const Icon(Icons.search_rounded, color: Colors.white),
+          onPressed: () => Navigator.of(context).push(
+            PageRouteBuilder(
+              pageBuilder: (_, __, ___) => const SearchPage(),
+              transitionsBuilder: (_, anim, __, child) =>
+                  FadeTransition(opacity: anim, child: child),
+              transitionDuration: const Duration(milliseconds: 300),
+            ),
+          ),
+        ),
         Padding(
-          padding: const EdgeInsets.only(right: 8),
+          padding: const EdgeInsets.only(right: 8,left: 8),
           child: GestureDetector(
             onTap: () async {
               await Navigator.of(context).push(
@@ -239,6 +251,7 @@ class _HomePageState extends State<HomePage> {
           icon: const Icon(Icons.logout, color: Color(0xFF888888), size: 20),
           onPressed: () => _logout(context),
         ),
+
       ],
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
