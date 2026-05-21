@@ -11,13 +11,9 @@ class MovieActionService {
 
   String? _currentUserEmail;
 
-  void setUser(String userEmail) {
-    _currentUserEmail = userEmail;
-  }
+  void setUser(String userEmail) => _currentUserEmail = userEmail;
 
-  void clearUser() {
-    _currentUserEmail = null;
-  }
+  void clearUser() => _currentUserEmail = null;
 
   String get _storageKey {
     if (_currentUserEmail == null) {
@@ -42,31 +38,57 @@ class MovieActionService {
     StorageService().setItem(_storageKey, encoded);
   }
 
-  UserMovieAction? getAction(int movieId) {
-    return _getAll()[movieId];
-  }
+  UserMovieAction? getAction(int movieId) => _getAll()[movieId];
 
-  void rateMovie(int movieId, String title, String posterPath, double rating) {
+  void rateMovie(
+      int movieId,
+      String title,
+      String posterPath,
+      double rating, {
+        String? review,
+      }) {
     final all = _getAll();
     final existing = all[movieId];
+    final trimmed =
+    (review != null && review.trim().isNotEmpty) ? review.trim() : null;
     all[movieId] = existing != null
-        ? existing.copyWith(rating: rating)
+        ? existing.copyWith(
+      rating: rating,
+      review: trimmed ?? existing.review,
+    )
         : UserMovieAction(
       movieId: movieId,
       movieTitle: title,
       posterPath: posterPath,
       rating: rating,
+      review: trimmed,
     );
+    _saveAll(all);
+  }
+
+  void setReview(int movieId, String review) {
+    final all = _getAll();
+    final existing = all[movieId];
+    if (existing == null || existing.rating == null) return;
+    final trimmed = review.trim();
+    all[movieId] = existing.copyWith(
+      review: trimmed.isNotEmpty ? trimmed : null,
+    );
+    _saveAll(all);
+  }
+
+  void removeReview(int movieId) {
+    final all = _getAll();
+    if (!all.containsKey(movieId)) return;
+    all[movieId] = all[movieId]!.copyWith(review: null);
     _saveAll(all);
   }
 
   void removeRating(int movieId) {
     final all = _getAll();
     if (!all.containsKey(movieId)) return;
-    all[movieId] = all[movieId]!.copyWith(rating: null);
-    if (all[movieId]!.rating == null && !all[movieId]!.watchLater) {
-      all.remove(movieId);
-    }
+    all[movieId] = all[movieId]!.copyWith(rating: null, review: null);
+    if (!all[movieId]!.watchLater) all.remove(movieId);
     _saveAll(all);
   }
 
@@ -91,11 +113,9 @@ class MovieActionService {
     _saveAll(all);
   }
 
-  List<UserMovieAction> getWatchLaterList() {
-    return _getAll().values.where((a) => a.watchLater).toList();
-  }
+  List<UserMovieAction> getWatchLaterList() =>
+      _getAll().values.where((a) => a.watchLater).toList();
 
-  List<UserMovieAction> getRatedMovies() {
-    return _getAll().values.where((a) => a.rating != null).toList();
-  }
+  List<UserMovieAction> getRatedMovies() =>
+      _getAll().values.where((a) => a.rating != null).toList();
 }

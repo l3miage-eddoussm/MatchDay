@@ -10,6 +10,7 @@ import '../services/movie_service.dart';
 import 'login_page.dart';
 import 'movie_detail_page.dart';
 import 'search_page.dart';
+import 'cinematch_page.dart';
 
 const List<Map<String, dynamic>> _kGenres = [
   {'id': 28,    'name': 'Action'},
@@ -208,50 +209,88 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
       actions: [
-        IconButton(
-          icon: const Icon(Icons.search_rounded, color: Colors.white),
-          onPressed: () => Navigator.of(context).push(
-            PageRouteBuilder(
-              pageBuilder: (_, __, ___) => const SearchPage(),
-              transitionsBuilder: (_, anim, __, child) =>
-                  FadeTransition(opacity: anim, child: child),
-              transitionDuration: const Duration(milliseconds: 300),
-            ),
-          ),
-        ),
         Padding(
-          padding: const EdgeInsets.only(right: 8,left: 8),
-          child: GestureDetector(
-            onTap: () async {
-              await Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => ProfilePage(user: widget.user),
+          padding: const EdgeInsets.only(right: 8),
+          child: Container(
+            height: 30,
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1A1A),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white12),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                GestureDetector(
+                  onTap: () => Navigator.of(context).push(
+                    PageRouteBuilder(
+                      pageBuilder: (_, __, ___) => const SearchPage(),
+                      transitionsBuilder: (_, anim, __, child) =>
+                          FadeTransition(opacity: anim, child: child),
+                      transitionDuration: const Duration(milliseconds: 300),
+                    ),
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10),
+                    child: Icon(Icons.search_rounded, color: Colors.white, size: 15),
+                  ),
                 ),
-              );
-              if (mounted) _refreshWatchLater();
-            },
-              child: Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: CircleAvatar(
-                  radius: 15,
-                  backgroundColor: const Color(0xFF2A2A2A),
-                  child: Text(
-                    widget.user.firstName[0].toUpperCase(),
-                    style: const TextStyle(
-                      color:      Colors.white,
-                      fontSize:   12,
-                      fontWeight: FontWeight.w700,
+                Container(width: 1, height: 14, color: Colors.white12),
+                GestureDetector(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const CineMatchPage()),
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10),
+                    child: Row(
+                      children: [
+                        Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 13),
+                        SizedBox(width: 4),
+                        Text(
+                          'CineMatch',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
+              ],
+            ),
+          ),
+        ),
+        GestureDetector(
+          onTap: () async {
+            await Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => ProfilePage(user: widget.user)),
+            );
+            if (mounted) _refreshWatchLater();
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: CircleAvatar(
+              radius: 14,
+              backgroundColor: const Color(0xFF2A2A2A),
+              child: Text(
+                widget.user.firstName[0].toUpperCase(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
+            ),
           ),
         ),
         IconButton(
-          icon: const Icon(Icons.logout, color: Color(0xFF888888), size: 20),
+          icon: const Icon(Icons.logout, color: Color(0xFF888888), size: 18),
           onPressed: () => _logout(context),
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 36),
         ),
-
       ],
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),

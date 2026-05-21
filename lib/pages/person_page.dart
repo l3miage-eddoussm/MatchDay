@@ -26,7 +26,7 @@ class _PersonPageState extends State<PersonPage>
   bool _bioExpanded = false;
   late TabController _tabController;
 
-  static const _purple = Color(0xFF7C3AED);
+  static const _red = Color(0xFFFF0000);
   static const _surfaceColor = Color(0xFF111111);
   static const _cardColor = Color(0xFF1A1A1A);
   static const _mutedColor = Color(0xFF888888);
@@ -220,7 +220,7 @@ class _PersonPageState extends State<PersonPage>
       padding:
       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: _purple.withOpacity(0.85),
+        color: _red.withOpacity(0.85),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
@@ -305,9 +305,9 @@ class _PersonPageState extends State<PersonPage>
     final color = pop > 100
         ? const Color(0xFFFFD700)
         : pop > 50
-        ? const Color(0xFF22C55E)
+        ? const Color(0xFF39EF00)
         : pop > 20
-        ? _purple
+        ? _red
         : _mutedColor;
 
     return Padding(
@@ -362,7 +362,7 @@ class _PersonPageState extends State<PersonPage>
             child: Text(
               _bioExpanded ? 'Voir moins' : 'Voir plus',
               style: const TextStyle(
-                  color: _purple,
+                  color: _red,
                   fontSize: 13,
                   fontWeight: FontWeight.w600),
             ),
@@ -384,7 +384,7 @@ class _PersonPageState extends State<PersonPage>
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
           child: TabBar(
             controller: _tabController,
-            indicatorColor: _purple,
+            indicatorColor: _red,
             labelColor: Colors.white,
             unselectedLabelColor: _mutedColor,
             indicatorSize: TabBarIndicatorSize.label,
@@ -544,7 +544,7 @@ class _PersonPageState extends State<PersonPage>
                         child: Container(
                           padding: const EdgeInsets.all(3),
                           decoration: BoxDecoration(
-                            color: _purple,
+                            color: _red,
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Icon(Icons.check,
