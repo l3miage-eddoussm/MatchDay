@@ -39,41 +39,49 @@ class _CineMatchPageState extends State<CineMatchPage>
 
   final List<_Question> _questions = const [
     _Question(
-      title: 'Comment tu te sens ?',
+      title: 'Comment tu te sens ce soir ?',
       subtitle: 'Ton humeur du moment',
       choices: [
-        _Choice(label: 'Joyeux', value: 'joyeux'),
-        _Choice(label: 'Mélancolique', value: 'melancolique'),
-        _Choice(label: 'En quête de frissons', value: 'frissons'),
-        _Choice(label: 'Curieux', value: 'curieux'),
-        _Choice(label: 'Détendu', value: 'detenu'),
+        _Choice(label: 'Je veux rire', value: 'fun'),
+        _Choice(label: 'Je veux avoir peur', value: 'scared'),
+        _Choice(label: 'Je veux réfléchir', value: 'think'),
+        _Choice(label: 'Je veux pleurer', value: 'sad'),
+        _Choice(label: 'Je veux de l\'adrénaline', value: 'thrill'),
+        _Choice(label: 'Je veux m\'évader', value: 'escape'),
       ],
     ),
     _Question(
-      title: 'Tu veux regarder quoi ?',
-      subtitle: 'Choisis un genre',
+      title: 'Quel style de film t\'attire ?',
+      subtitle: 'Ton type préféré ce soir',
       choices: [
-        _Choice(label: 'Action', value: 28),
-        _Choice(label: 'Comédie', value: 35),
-        _Choice(label: 'Drame', value: 18),
-        _Choice(label: 'Horreur', value: 27),
-        _Choice(label: 'Science-Fiction', value: 878),
-        _Choice(label: 'Romance', value: 10749),
-        _Choice(label: 'Thriller', value: 53),
+        _Choice(label: 'Quelque chose de réaliste', value: 'realistic'),
+        _Choice(label: 'Un univers fantastique', value: 'fantasy'),
+        _Choice(label: 'Basé sur des faits réels', value: 'true_story'),
+        _Choice(label: 'Peu importe', value: 'any'),
+      ],
+    ),
+    _Question(
+      title: 'Tu préfères quelle époque ?',
+      subtitle: 'Période de sortie',
+      choices: [
+        _Choice(label: 'Très récent (après 2020)', value: 'recent'),
+        _Choice(label: 'Années 2000–2020', value: 'modern'),
+        _Choice(label: 'Classique (avant 2000)', value: 'classic'),
+        _Choice(label: 'Peu importe', value: 'any'),
       ],
     ),
     _Question(
       title: 'Combien de temps t\'as ?',
       subtitle: 'Durée du film',
       choices: [
-        _Choice(label: 'Moins de 1h30', value: 90),
-        _Choice(label: '1h30 — 2h', value: 120),
-        _Choice(label: 'Plus de 2h', value: 999),
+        _Choice(label: 'Moins de 1h30', value: 'short'),
+        _Choice(label: '1h30 — 2h', value: 'medium'),
+        _Choice(label: 'Plus de 2h', value: 'long'),
       ],
     ),
     _Question(
-      title: 'Ambiance du soir ?',
-      subtitle: 'Tu regardes avec qui',
+      title: 'Tu regardes avec qui ?',
+      subtitle: 'Ambiance du soir',
       choices: [
         _Choice(label: 'Solo', value: 'solo'),
         _Choice(label: 'En couple', value: 'couple'),
@@ -83,19 +91,43 @@ class _CineMatchPageState extends State<CineMatchPage>
     ),
   ];
 
-  final Map<String, double> _moodToRating = const {
-    'joyeux': 7.0,
-    'melancolique': 6.5,
-    'frissons': 6.0,
-    'curieux': 7.0,
-    'detenu': 6.5,
+  static const Map<String, List<int>> _moodGenres = {
+    'fun':    [35],
+    'scared': [27, 53],
+    'think':  [18, 9648],
+    'sad':    [18, 10749],
+    'thrill': [28, 80],
+    'escape': [12, 14],
   };
 
-  final Map<String, int> _audienceGenreBonus = const {
+  static const Map<String, double> _moodMinRating = {
+    'fun':    6.5,
+    'scared': 6.0,
+    'think':  7.0,
+    'sad':    6.5,
+    'thrill': 6.5,
+    'escape': 6.5,
+  };
+
+  static const Map<String, List<int>> _audienceExcludedGenres = {
+    'famille': [27, 53, 80, 9648],
+    'couple':  [],
+    'amis':    [],
+    'solo':    [],
+  };
+
+  static const Map<String, int> _audienceBonusGenre = {
     'famille': 16,
-    'couple': 10749,
-    'amis': 35,
-    'solo': 0,
+    'couple':  10749,
+    'amis':    35,
+    'solo':    0,
+  };
+
+  static const Map<String, List<int>> _styleGenres = {
+    'realistic': [18, 36],
+    'fantasy':   [14, 878, 16],
+    'true_story': [36, 99],
+    'any':       [],
   };
 
   int _step = 0;
@@ -187,31 +219,71 @@ class _CineMatchPageState extends State<CineMatchPage>
 
   Future<void> _fetchMovie() async {
     try {
-      final genreId = _answers[1] as int;
-      final maxDuration = _answers[2] as int;
-      final mood = _answers[0] as String;
-      final audience = _answers[3] as String;
+      final mood     = _answers[0] as String;
+      final style    = _answers[1] as String;
+      final era      = _answers[2] as String;
+      final duration = _answers[3] as String;
+      final audience = _answers[4] as String;
 
-      final minRating = _moodToRating[mood] ?? 6.5;
-      final bonusGenre = _audienceGenreBonus[audience] ?? 0;
-      final genreParam =
-      bonusGenre > 0 ? '$genreId,$bonusGenre' : '$genreId';
-      final maxRuntime =
-      maxDuration == 90 ? 90 : maxDuration == 120 ? 120 : 300;
-      final minRuntime = maxDuration == 999 ? 121 : 0;
-      final page = Random().nextInt(5) + 1;
+      final excludedGenres = List<int>.from(_audienceExcludedGenres[audience] ?? []);
+      final bonusGenre     = _audienceBonusGenre[audience] ?? 0;
+
+      final moodGenreList  = List<int>.from(_moodGenres[mood] ?? [18]);
+      final styleGenreList = List<int>.from(_styleGenres[style] ?? []);
+
+      final Set<int> genreSet = {};
+      for (final g in [...moodGenreList, ...styleGenreList]) {
+        if (!excludedGenres.contains(g)) genreSet.add(g);
+      }
+      if (bonusGenre > 0 && !excludedGenres.contains(bonusGenre)) {
+        genreSet.add(bonusGenre);
+      }
+
+      final genreParam = genreSet.isNotEmpty ? genreSet.join(',') : '18';
+      final minRating  = (_moodMinRating[mood] ?? 6.5).clamp(5.0, 9.0);
+
+      final rng  = Random();
+      final page = rng.nextInt(8) + 1;
 
       final buffer = StringBuffer(
         '${AppConstants.tmdbBaseUrl}/discover/movie'
             '?language=fr-FR'
-            '&sort_by=vote_average.desc'
-            '&vote_count.gte=300'
+            '&sort_by=popularity.desc'
+            '&vote_count.gte=200'
             '&vote_average.gte=$minRating'
             '&with_genres=$genreParam'
-            '&with_runtime.lte=$maxRuntime'
             '&page=$page',
       );
-      if (minRuntime > 0) buffer.write('&with_runtime.gte=$minRuntime');
+
+      switch (duration) {
+        case 'short':
+          buffer.write('&with_runtime.lte=89');
+          break;
+        case 'medium':
+          buffer.write('&with_runtime.gte=90&with_runtime.lte=120');
+          break;
+        case 'long':
+          buffer.write('&with_runtime.gte=121');
+          break;
+      }
+
+      switch (era) {
+        case 'recent':
+          buffer.write('&primary_release_date.gte=2020-01-01');
+          break;
+        case 'modern':
+          buffer.write(
+              '&primary_release_date.gte=2000-01-01'
+                  '&primary_release_date.lte=2019-12-31');
+          break;
+        case 'classic':
+          buffer.write('&primary_release_date.lte=1999-12-31');
+          break;
+      }
+
+      if (audience == 'famille') {
+        buffer.write('&without_genres=27,53,80,9648');
+      }
 
       final response = await http.get(
         Uri.parse(buffer.toString()),
@@ -233,27 +305,21 @@ class _CineMatchPageState extends State<CineMatchPage>
         return;
       }
 
-      final data = jsonDecode(response.body);
+      final data    = jsonDecode(response.body);
       final results = data['results'] as List? ?? [];
 
       if (results.isEmpty) {
-        await _animController.reverse();
-        if (!mounted) return;
-        setState(() {
-          _error = 'Aucun film trouvé.\nEssaie d\'autres réponses !';
-          _isLoading = false;
-        });
-        _animController.forward();
+        await _fetchMovieFallback(mood, era, duration);
         return;
       }
 
-      final picked = results[Random().nextInt(min(results.length, 10))];
-      final movie = Movie.fromJson(picked as Map<String, dynamic>);
+      final picked = results[rng.nextInt(min(results.length, 15))];
+      final movie  = Movie.fromJson(picked as Map<String, dynamic>);
 
       await _animController.reverse();
       if (!mounted) return;
       setState(() {
-        _result = movie;
+        _result    = movie;
         _isLoading = false;
       });
       _animController.forward();
@@ -261,7 +327,83 @@ class _CineMatchPageState extends State<CineMatchPage>
       if (!mounted) return;
       await _animController.reverse();
       setState(() {
-        _error = 'Une erreur est survenue.\nVérifie ta connexion et réessaie.';
+        _error    = 'Une erreur est survenue.\nVérifie ta connexion et réessaie.';
+        _isLoading = false;
+      });
+      _animController.forward();
+    }
+  }
+
+  Future<void> _fetchMovieFallback(
+      String mood, String era, String duration) async {
+    try {
+      final moodGenreList = List<int>.from(_moodGenres[mood] ?? [18]);
+      final genreParam    = moodGenreList.first.toString();
+      final minRating     = (_moodMinRating[mood] ?? 6.0) - 0.5;
+
+      final buffer = StringBuffer(
+        '${AppConstants.tmdbBaseUrl}/discover/movie'
+            '?language=fr-FR'
+            '&sort_by=popularity.desc'
+            '&vote_count.gte=100'
+            '&vote_average.gte=$minRating'
+            '&with_genres=$genreParam'
+            '&page=${Random().nextInt(5) + 1}',
+      );
+
+      switch (era) {
+        case 'recent':
+          buffer.write('&primary_release_date.gte=2020-01-01');
+          break;
+        case 'modern':
+          buffer.write(
+              '&primary_release_date.gte=2000-01-01'
+                  '&primary_release_date.lte=2019-12-31');
+          break;
+        case 'classic':
+          buffer.write('&primary_release_date.lte=1999-12-31');
+          break;
+      }
+
+      final response = await http.get(
+        Uri.parse(buffer.toString()),
+        headers: {
+          'Authorization': 'Bearer ${AppConstants.tmdbToken}',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (!mounted) return;
+
+      final data    = jsonDecode(response.body);
+      final results = data['results'] as List? ?? [];
+
+      if (results.isEmpty) {
+        await _animController.reverse();
+        if (!mounted) return;
+        setState(() {
+          _error    = 'Aucun film trouvé.\nEssaie d\'autres réponses !';
+          _isLoading = false;
+        });
+        _animController.forward();
+        return;
+      }
+
+      final picked = results[Random().nextInt(min(results.length, 15))];
+      final movie  = Movie.fromJson(picked as Map<String, dynamic>);
+
+      await _animController.reverse();
+      if (!mounted) return;
+      setState(() {
+        _result    = movie;
+        _isLoading = false;
+      });
+      _animController.forward();
+    } catch (_) {
+      if (!mounted) return;
+      await _animController.reverse();
+      setState(() {
+        _error    = 'Une erreur est survenue.\nVérifie ta connexion et réessaie.';
         _isLoading = false;
       });
       _animController.forward();
@@ -273,8 +415,8 @@ class _CineMatchPageState extends State<CineMatchPage>
     if (!mounted) return;
     setState(() {
       _isLoading = true;
-      _result = null;
-      _error = null;
+      _result    = null;
+      _error     = null;
     });
     await _fetchMovie();
   }
@@ -349,8 +491,8 @@ class _CineMatchPageState extends State<CineMatchPage>
             GestureDetector(
               onTap: _restart,
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 6),
+                padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: _card,
                   borderRadius: BorderRadius.circular(20),
@@ -667,8 +809,8 @@ class _CineMatchPageState extends State<CineMatchPage>
                   ),
                   child: const Text(
                     'Voir le film',
-                    style: TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.w700),
+                    style:
+                    TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                   ),
                 ),
               ),
@@ -708,8 +850,8 @@ class _CineMatchPageState extends State<CineMatchPage>
                   ),
                   child: const Text(
                     'Retour à l\'accueil',
-                    style: TextStyle(
-                        color: Color(0xFF666666), fontSize: 14),
+                    style:
+                    TextStyle(color: Color(0xFF666666), fontSize: 14),
                   ),
                 ),
               ),
@@ -768,8 +910,8 @@ class _CineMatchPageState extends State<CineMatchPage>
                   ),
                   child: const Text(
                     'Réessayer',
-                    style: TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.w700),
+                    style:
+                    TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                   ),
                 ),
               ),

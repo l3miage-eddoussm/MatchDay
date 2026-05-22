@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/movie.dart';
 import '../models/movie_detail.dart';
 import '../models/user_movie_action.dart';
+import '../services/auth_service.dart';
 import '../services/movie_action_service.dart';
 import '../services/movie_service.dart';
 import '../widgets/action_buttons.dart';
@@ -13,6 +14,10 @@ import '../widgets/rating_bottom_sheet.dart';
 import '../widgets/section_title.dart';
 import '../widgets/similar_movies_section.dart';
 import '../widgets/video_section.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:screenshot/screenshot.dart';
+import 'package:share_plus/share_plus.dart';
 
 class MovieDetailPage extends StatefulWidget {
   final Movie movie;
@@ -32,11 +37,196 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
   List<CrewMember> _directors = [];
   List<Movie> _similar = [];
   bool _isLoading = true;
+  String _username = '';
+  final ScreenshotController _screenshotController = ScreenshotController();
 
   @override
   void initState() {
     super.initState();
     _loadDetails();
+  }
+
+  Future<void> _shareReview() async {
+    final movie = _details ?? widget.movie;
+    try {
+      final imageBytes = await _screenshotController.capture(pixelRatio: 3.0);
+      if (imageBytes == null) return;
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/critique_${movie.id}.png');
+      await file.writeAsBytes(imageBytes);
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: 'Ma critique de "${movie.title}" sur CINEART',
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Impossible de générer la carte.'),
+          backgroundColor: Color(0xFF1A1A1A),
+        ),
+      );
+    }
+  }
+
+  Widget _buildShareCard(Movie movie) {
+    final review = _userAction?.review ?? '';
+    final rating = _userAction?.rating?.toInt() ?? 0;
+
+    return Material(
+      type: MaterialType.transparency,
+      child: SizedBox(
+        width: 400,
+        height: 600,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            movie.posterPath.isNotEmpty
+                ? Image.network(
+              'https://image.tmdb.org/t/p/w500${movie.posterPath}',
+              fit: BoxFit.cover,
+            )
+                : Container(color: const Color(0xFF1A1A1A)),
+            Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(0x00000000),
+                    Color(0xBB000000),
+                    Color(0xF2000000),
+                  ],
+                  stops: [0.25, 0.55, 1.0],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    movie.title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 26,
+                      fontWeight: FontWeight.w900,
+                      height: 1.2,
+                      letterSpacing: 0.3,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      ...List.generate(
+                        10,
+                            (i) => Padding(
+                          padding: const EdgeInsets.only(right: 2),
+                          child: Icon(
+                            i < rating
+                                ? Icons.star_rounded
+                                : Icons.star_outline_rounded,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '$rating/10',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.07),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                          color: Colors.white.withOpacity(0.15)),
+                    ),
+                    child: Text(
+                      '"$review"',
+                      maxLines: 5,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontStyle: FontStyle.italic,
+                        height: 1.6,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2A2A2A),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white24),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          _username.isNotEmpty
+                              ? _username[0].toUpperCase()
+                              : '?',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            decoration: TextDecoration.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _username,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            decoration: TextDecoration.none,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const Text(
+                        'CINEART',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 2.5,
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _loadDetails() async {
@@ -51,6 +241,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
       ]);
 
       final userAction = MovieActionService().getAction(id);
+      final currentUser = await AuthService().getCurrentUser();
 
       setState(() {
         _details = results[0] as Movie;
@@ -63,6 +254,9 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
         _directors = credits['crew'] as List<CrewMember>;
         _similar = results[4] as List<Movie>;
         _userAction = userAction;
+        _username = currentUser != null
+            ? '${currentUser.firstName} ${currentUser.lastName}'
+            : '';
         _isLoading = false;
       });
     } catch (e) {
@@ -90,10 +284,10 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
             const Spacer(),
             GestureDetector(
               onTap: _openRatingSheet,
-              child: Text(
-                hasReview ? 'Modifier' : 'Écrire',
-                style: const TextStyle(
-                  color: Color(0xFFFFFFFF),
+              child: const Text(
+                'Modifier',
+                style: TextStyle(
+                  color: Color(0xFFF60000),
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -102,7 +296,38 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
           ],
         ),
         const SizedBox(height: 12),
-        if (hasReview)
+        if (hasReview) ...[
+          GestureDetector(
+            onTap: _shareReview,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFFFF).withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                    color: const Color(0xFFFAFAFA).withOpacity(0.4)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Icon(Icons.ios_share_rounded,
+                      color: Color(0xFFFFFFFF), size: 15),
+                  SizedBox(width: 7),
+                  Text(
+                    'Partager ma critique',
+                    style: TextStyle(
+                      color: Color(0xFFFFFFFF),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(14),
@@ -119,8 +344,8 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                 height: 1.6,
               ),
             ),
-          )
-        else
+          ),
+        ] else
           GestureDetector(
             onTap: _openRatingSheet,
             child: Container(
@@ -129,10 +354,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
               decoration: BoxDecoration(
                 color: const Color(0xFF111111),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: const Color(0xFF2A2A2A),
-                  style: BorderStyle.solid,
-                ),
+                border: Border.all(color: const Color(0xFF2A2A2A)),
               ),
               child: const Text(
                 'Partager votre avis sur ce film...',
@@ -198,69 +420,88 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
 
     return PopScope(
       canPop: true,
-      child: Scaffold(
-        backgroundColor: Colors.black,
-        body: _isLoading
-            ? const Center(
-          child: CircularProgressIndicator(
-              color: Colors.white, strokeWidth: 2),
-        )
-            : CustomScrollView(
-          slivers: [
-            _buildAppBar(movie),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    MovieInfoHeader(
-                      movie: movie,
-                      directors: _directors,
+      child: Stack(
+        children: [
+          Scaffold(
+            backgroundColor: Colors.black,
+            body: _isLoading
+                ? const Center(
+              child: CircularProgressIndicator(
+                  color: Colors.white, strokeWidth: 2),
+            )
+                : CustomScrollView(
+              slivers: [
+                _buildAppBar(movie),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding:
+                    const EdgeInsets.fromLTRB(20, 8, 20, 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        MovieInfoHeader(
+                          movie: movie,
+                          directors: _directors,
+                        ),
+                        const SizedBox(height: 20),
+                        ActionButtons(
+                          userAction: _userAction,
+                          onRatingTap: _openRatingSheet,
+                          onWatchLaterTap: _toggleWatchLater,
+                        ),
+                        if (_userAction?.rating != null) ...[
+                          const SizedBox(height: 24),
+                          _buildMyReview(),
+                        ],
+                      ],
                     ),
-                    const SizedBox(height: 20),
-                    ActionButtons(
-                      userAction: _userAction,
-                      onRatingTap: _openRatingSheet,
-                      onWatchLaterTap: _toggleWatchLater,
-                    ),
-                    if (_userAction?.rating != null) ...[
-                      const SizedBox(height: 24),
-                      _buildMyReview(),
-                    ],
-                  ],
+                  ),
                 ),
-              ),
+                if (_cast.isNotEmpty) ...[
+                  SliverToBoxAdapter(
+                      child: SectionTitle(title: 'Casting')),
+                  SliverToBoxAdapter(
+                      child: CastSection(cast: _cast)),
+                ],
+                if (_videos.isNotEmpty) ...[
+                  SliverToBoxAdapter(
+                      child: SectionTitle(title: 'Vidéos')),
+                  SliverToBoxAdapter(
+                    child: VideoSection(
+                      videos: _videos,
+                      onTap: _openTrailer,
+                    ),
+                  ),
+                ],
+                if (_imageUrls.isNotEmpty) ...[
+                  SliverToBoxAdapter(
+                      child: SectionTitle(title: 'Images')),
+                  SliverToBoxAdapter(
+                    child: ImagesSection(imageUrls: _imageUrls),
+                  ),
+                ],
+                if (_similar.isNotEmpty) ...[
+                  SliverToBoxAdapter(
+                      child:
+                      SectionTitle(title: 'Films similaires')),
+                  SliverToBoxAdapter(
+                    child: SimilarMoviesSection(movies: _similar),
+                  ),
+                ],
+                const SliverToBoxAdapter(
+                    child: SizedBox(height: 40)),
+              ],
             ),
-            if (_cast.isNotEmpty) ...[
-              SliverToBoxAdapter(child: SectionTitle(title: 'Casting')),
-              SliverToBoxAdapter(child: CastSection(cast: _cast)),
-            ],
-            if (_videos.isNotEmpty) ...[
-              SliverToBoxAdapter(child: SectionTitle(title: 'Vidéos')),
-              SliverToBoxAdapter(
-                child: VideoSection(
-                  videos: _videos,
-                  onTap: _openTrailer,
-                ),
-              ),
-            ],
-            if (_imageUrls.isNotEmpty) ...[
-              SliverToBoxAdapter(child: SectionTitle(title: 'Images')),
-              SliverToBoxAdapter(
-                child: ImagesSection(imageUrls: _imageUrls),
-              ),
-            ],
-            if (_similar.isNotEmpty) ...[
-              SliverToBoxAdapter(
-                  child: SectionTitle(title: 'Films similaires')),
-              SliverToBoxAdapter(
-                child: SimilarMoviesSection(movies: _similar),
-              ),
-            ],
-            const SliverToBoxAdapter(child: SizedBox(height: 40)),
-          ],
-        ),
+          ),
+          Positioned(
+            left: -2000,
+            top: 0,
+            child: Screenshot(
+              controller: _screenshotController,
+              child: _buildShareCard(movie),
+            ),
+          ),
+        ],
       ),
     );
   }

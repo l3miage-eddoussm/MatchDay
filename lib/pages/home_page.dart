@@ -212,7 +212,7 @@ class _HomePageState extends State<HomePage> {
         Padding(
           padding: const EdgeInsets.only(right: 8),
           child: Container(
-            height: 30,
+            height: 34,
             decoration: BoxDecoration(
               color: const Color(0xFF1A1A1A),
               borderRadius: BorderRadius.circular(20),
@@ -231,7 +231,7 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                   child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 10),
+                    padding: EdgeInsets.symmetric(horizontal: 8),
                     child: Icon(Icons.search_rounded, color: Colors.white, size: 15),
                   ),
                 ),
@@ -241,7 +241,7 @@ class _HomePageState extends State<HomePage> {
                     MaterialPageRoute(builder: (_) => const CineMatchPage()),
                   ),
                   child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 10),
+                    padding: EdgeInsets.symmetric(horizontal: 8),
                     child: Row(
                       children: [
                         Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 13),
@@ -270,15 +270,15 @@ class _HomePageState extends State<HomePage> {
             if (mounted) _refreshWatchLater();
           },
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
             child: CircleAvatar(
-              radius: 14,
+              radius: 17,
               backgroundColor: const Color(0xFF2A2A2A),
               child: Text(
                 widget.user.firstName[0].toUpperCase(),
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 11,
+                  fontSize: 13,
                   fontWeight: FontWeight.w700,
                 ),
               ),
