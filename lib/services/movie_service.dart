@@ -184,4 +184,23 @@ class MovieService {
     final data = jsonDecode(response.body);
     return List<Map<String, dynamic>>.from(data['results'] ?? []);
   }
+  Future<Map<String, dynamic>> getCollection(int collectionId) async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.tmdbBaseUrl}/collection/$collectionId?language=fr-FR'),
+      headers: _headers,
+    );
+    if (response.statusCode != 200) throw Exception('Impossible de charger la collection.');
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final parts = (data['parts'] as List)
+        .map((e) => Movie.fromJson(e))
+        .toList()
+      ..sort((a, b) => a.releaseDate.compareTo(b.releaseDate));
+    return {
+      'name': data['name'] ?? '',
+      'overview': data['overview'] ?? '',
+      'backdropPath': data['backdrop_path'] ?? '',
+      'posterPath': data['poster_path'] ?? '',
+      'parts': parts,
+    };
+  }
 }

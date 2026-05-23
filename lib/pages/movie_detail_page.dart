@@ -18,6 +18,7 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:share_plus/share_plus.dart';
+import 'collection_page.dart';
 
 class MovieDetailPage extends StatefulWidget {
   final Movie movie;
@@ -44,6 +45,62 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
   void initState() {
     super.initState();
     _loadDetails();
+  }
+
+  Widget _buildCollectionButton(Movie movie) {
+    final collection = movie.belongsToCollection!;
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => CollectionPage(currentMovie: movie),
+          ),
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF141414),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withOpacity(0.1)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.collections_bookmark_rounded,
+                color: Colors.white54, size: 18),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'FAIT PARTIE D\'UNE COLLECTION',
+                    style: TextStyle(
+                      color: Colors.white38,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    collection.name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded,
+                color: Colors.white24, size: 20),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _shareReview() async {
@@ -287,7 +344,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
               child: const Text(
                 'Modifier',
                 style: TextStyle(
-                  color: Color(0xFFF60000),
+                  color: Color(0xFFFFFFFF),
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -444,6 +501,10 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                           directors: _directors,
                         ),
                         const SizedBox(height: 20),
+                        if (movie.belongsToCollection != null)
+                          _buildCollectionButton(movie),
+                        if (movie.belongsToCollection != null)
+                          const SizedBox(height: 12),
                         ActionButtons(
                           userAction: _userAction,
                           onRatingTap: _openRatingSheet,
