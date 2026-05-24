@@ -561,6 +561,14 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
 
   Future<void> _openRatingSheet() async {
     final movie = _details ?? widget.movie;
+
+    int? releaseYear;
+    if (movie.releaseDate.length >= 4) {
+      releaseYear = int.tryParse(movie.releaseDate.substring(0, 4));
+    }
+
+    final genreNames = List<String>.from(movie.genres);
+
     await showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -575,6 +583,10 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
             movie.posterPath,
             rating,
             review: review,
+            releaseYear: releaseYear,
+            genres: genreNames,
+            directors: _directors,
+            cast: _cast,
           );
           final updated = MovieActionService().getAction(movie.id);
           if (mounted) setState(() => _userAction = updated);

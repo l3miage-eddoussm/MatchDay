@@ -13,15 +13,23 @@ import 'search_page.dart';
 import 'cinematch_page.dart';
 
 const List<Map<String, dynamic>> _kGenres = [
-  {'id': 28,    'name': 'Action'},
-  {'id': 35,    'name': 'Comédie'},
-  {'id': 27,    'name': 'Horreur'},
-  {'id': 878,   'name': 'Science-Fiction'},
-  {'id': 16,    'name': 'Animation'},
-  {'id': 53,    'name': 'Thriller'},
+  {'id': 28, 'name': 'Action'},
+  {'id': 35, 'name': 'Comédie'},
+  {'id': 27, 'name': 'Horreur'},
+  {'id': 878, 'name': 'Science-Fiction'},
+  {'id': 16, 'name': 'Animation'},
+  {'id': 53, 'name': 'Thriller'},
   {'id': 10749, 'name': 'Romance'},
-  {'id': 99,    'name': 'Documentaire'},
+  {'id': 99, 'name': 'Documentaire'},
 ];
+
+class _SectionState {
+  List<Movie> movies;
+  int currentPage;
+  bool isLoadingMore;
+
+  _SectionState({this.movies = const [], this.currentPage = 1, this.isLoadingMore = false});
+}
 
 class HomePage extends StatefulWidget {
   final User user;
@@ -32,23 +40,27 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  List<Movie>            _trending    = [];
-  List<Movie>            _nowPlaying  = [];
-  List<Movie>            _topRated    = [];
-  List<Movie>            _upcoming    = [];
-  List<UserMovieAction>  _watchLater  = [];
-  final Map<int, List<Movie>> _byGenre = {};
+  late _SectionState _trending;
+  late _SectionState _nowPlaying;
+  late _SectionState _topRated;
+  late _SectionState _upcoming;
+  final Map<int, _SectionState> _byGenre = {};
 
-  bool    _isLoading = true;
+  List<UserMovieAction> _watchLater = [];
+  bool _isLoading = true;
   String? _error;
 
-  final PageController _heroCtrl  = PageController();
-  Timer?               _heroTimer;
-  int                  _heroIndex = 0;
+  final PageController _heroCtrl = PageController();
+  Timer? _heroTimer;
+  int _heroIndex = 0;
 
   @override
   void initState() {
     super.initState();
+    _trending = _SectionState();
+    _nowPlaying = _SectionState();
+    _topRated = _SectionState();
+    _upcoming = _SectionState();
     _loadAll();
   }
 
@@ -61,9 +73,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _loadAll() async {
     try {
-      final genreFutures =
-      _kGenres.map((g) => MovieService().getMoviesByGenre(g['id'] as int));
-
+      final genreFutures = _kGenres.map((g) => MovieService().getMoviesByGenre(g['id'] as int));
       final results = await Future.wait([
         MovieService().getTrendingMovies(),
         MovieService().getNowPlayingMovies(),
@@ -73,41 +83,50 @@ class _HomePageState extends State<HomePage> {
       ]);
 
       setState(() {
-        _trending   = results[0] as List<Movie>;
-        _nowPlaying = results[1] as List<Movie>;
-        _topRated   = results[2] as List<Movie>;
-        _upcoming   = results[3] as List<Movie>;
+        _trending = _SectionState(movies: results[0] as List<Movie>);
+        _nowPlaying = _SectionState(movies: results[1] as List<Movie>);
+        _topRated = _SectionState(movies: results[2] as List<Movie>);
+        _upcoming = _SectionState(movies: results[3] as List<Movie>);
         for (int i = 0; i < _kGenres.length; i++) {
-          _byGenre[_kGenres[i]['id'] as int] = results[4 + i] as List<Movie>;
+          _byGenre[_kGenres[i]['id'] as int] =
+              _SectionState(movies: results[4 + i] as List<Movie>);
         }
         _watchLater = MovieActionService().getWatchLaterList();
-        _isLoading  = false;
+        _isLoading = false;
       });
-
       _startHeroTimer();
     } catch (e) {
       setState(() {
-        _error     = e.toString().replaceAll('Exception: ', '');
+        _error = e.toString().replaceAll('Exception: ', '');
         _isLoading = false;
       });
     }
   }
 
+  Future<void> _loadMore(_SectionState section, Future<List<Movie>> Function(int) fetcher) async {
+    if (section.isLoadingMore) return;
+    setState(() => section.isLoadingMore = true);
+    try {
+      final next = await fetcher(section.currentPage + 1);
+      setState(() {
+        section.movies = [...section.movies, ...next];
+        section.currentPage++;
+        section.isLoadingMore = false;
+      });
+    } catch (_) {
+      setState(() => section.isLoadingMore = false);
+    }
+  }
+
   void _refreshWatchLater() {
-    setState(() {
-      _watchLater = MovieActionService().getWatchLaterList();
-    });
+    setState(() => _watchLater = MovieActionService().getWatchLaterList());
   }
 
   void _startHeroTimer() {
     _heroTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (!mounted || _trending.isEmpty) return;
-      final next = (_heroIndex + 1) % _trending.take(5).length;
-      _heroCtrl.animateToPage(
-        next,
-        duration: const Duration(milliseconds: 700),
-        curve: Curves.easeInOut,
-      );
+      if (!mounted || _trending.movies.isEmpty) return;
+      final next = (_heroIndex + 1) % _trending.movies.take(5).length;
+      _heroCtrl.animateToPage(next, duration: const Duration(milliseconds: 700), curve: Curves.easeInOut);
     });
   }
 
@@ -125,8 +144,7 @@ class _HomePageState extends State<HomePage> {
     await Navigator.of(context).push(
       PageRouteBuilder(
         pageBuilder: (_, __, ___) => MovieDetailPage(movie: movie),
-        transitionsBuilder: (_, anim, __, child) =>
-            FadeTransition(opacity: anim, child: child),
+        transitionsBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
         transitionDuration: const Duration(milliseconds: 350),
       ),
     );
@@ -134,11 +152,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _toggleWatchLaterHero(Movie movie) {
-    MovieActionService().toggleWatchLater(
-      movie.id,
-      movie.title,
-      movie.posterPath,
-    );
+    MovieActionService().toggleWatchLater(movie.id, movie.title, movie.posterPath);
     _refreshWatchLater();
   }
 
@@ -147,23 +161,16 @@ class _HomePageState extends State<HomePage> {
     if (_isLoading) {
       return const Scaffold(
         backgroundColor: Colors.black,
-        body: Center(
-          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-        ),
+        body: Center(child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)),
       );
     }
-
     if (_error != null) {
       return Scaffold(
         backgroundColor: Colors.black,
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(32),
-            child: Text(
-              _error!,
-              style: const TextStyle(color: Color(0xFFFF4444), fontSize: 14),
-              textAlign: TextAlign.center,
-            ),
+            child: Text(_error!, style: const TextStyle(color: Color(0xFFFF4444), fontSize: 14), textAlign: TextAlign.center),
           ),
         ),
       );
@@ -175,17 +182,29 @@ class _HomePageState extends State<HomePage> {
         slivers: [
           _buildAppBar(),
           SliverToBoxAdapter(child: _buildHeroBanner()),
-          if (_watchLater.isNotEmpty)
-            SliverToBoxAdapter(child: _buildWatchLaterSection()),
-          SliverToBoxAdapter(child: _buildSection('Tendances',       _trending)),
-          SliverToBoxAdapter(child: _buildSection('À l\'affiche',    _nowPlaying)),
-          SliverToBoxAdapter(child: _buildSection('Les mieux notés', _topRated)),
-          SliverToBoxAdapter(child: _buildSection('Prochainement',   _upcoming)),
+          if (_watchLater.isNotEmpty) SliverToBoxAdapter(child: _buildWatchLaterSection()),
+          SliverToBoxAdapter(
+            child: _buildSection('Tendances', _trending,
+                    (p) => MovieService().getTrendingMovies(page: p)),
+          ),
+          SliverToBoxAdapter(
+            child: _buildSection('À l\'affiche', _nowPlaying,
+                    (p) => MovieService().getNowPlayingMovies(page: p)),
+          ),
+          SliverToBoxAdapter(
+            child: _buildSection('Les mieux notés', _topRated,
+                    (p) => MovieService().getTopRatedMovies(page: p)),
+          ),
+          SliverToBoxAdapter(
+            child: _buildSection('Prochainement', _upcoming,
+                    (p) => MovieService().getUpcomingMovies(page: p)),
+          ),
           for (final genre in _kGenres)
             SliverToBoxAdapter(
               child: _buildSection(
                 genre['name'] as String,
-                _byGenre[genre['id']] ?? [],
+                _byGenre[genre['id']] ?? _SectionState(),
+                    (p) => MovieService().getMoviesByGenre(genre['id'] as int, page: p),
               ),
             ),
           const SliverToBoxAdapter(child: SizedBox(height: 48)),
@@ -201,12 +220,7 @@ class _HomePageState extends State<HomePage> {
       elevation: 0,
       title: const Text(
         'CINEART',
-        style: TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 6,
-          fontSize: 18,
-        ),
+        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 6, fontSize: 18),
       ),
       actions: [
         Padding(
@@ -222,14 +236,11 @@ class _HomePageState extends State<HomePage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 GestureDetector(
-                  onTap: () => Navigator.of(context).push(
-                    PageRouteBuilder(
-                      pageBuilder: (_, __, ___) => const SearchPage(),
-                      transitionsBuilder: (_, anim, __, child) =>
-                          FadeTransition(opacity: anim, child: child),
-                      transitionDuration: const Duration(milliseconds: 300),
-                    ),
-                  ),
+                  onTap: () => Navigator.of(context).push(PageRouteBuilder(
+                    pageBuilder: (_, __, ___) => const SearchPage(),
+                    transitionsBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
+                    transitionDuration: const Duration(milliseconds: 300),
+                  )),
                   child: const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 8),
                     child: Icon(Icons.search_rounded, color: Colors.white, size: 15),
@@ -237,23 +248,14 @@ class _HomePageState extends State<HomePage> {
                 ),
                 Container(width: 1, height: 14, color: Colors.white12),
                 GestureDetector(
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const CineMatchPage()),
-                  ),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CineMatchPage())),
                   child: const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 8),
                     child: Row(
                       children: [
                         Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 13),
                         SizedBox(width: 4),
-                        Text(
-                          'CineMatch',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        Text('CineMatch', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
                       ],
                     ),
                   ),
@@ -264,9 +266,7 @@ class _HomePageState extends State<HomePage> {
         ),
         GestureDetector(
           onTap: () async {
-            await Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => ProfilePage(user: widget.user)),
-            );
+            await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ProfilePage()));
             if (mounted) _refreshWatchLater();
           },
           child: Padding(
@@ -276,11 +276,7 @@ class _HomePageState extends State<HomePage> {
               backgroundColor: const Color(0xFF2A2A2A),
               child: Text(
                 widget.user.firstName[0].toUpperCase(),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
               ),
             ),
           ),
@@ -300,9 +296,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildHeroBanner() {
-    final heroes = _trending.take(5).toList();
+    final heroes = _trending.movies.take(5).toList();
     if (heroes.isEmpty) return const SizedBox.shrink();
-
     return SizedBox(
       height: 500,
       child: Stack(
@@ -312,14 +307,9 @@ class _HomePageState extends State<HomePage> {
             onPageChanged: (i) => setState(() => _heroIndex = i),
             itemCount: heroes.length,
             itemBuilder: (_, index) {
-              final movie     = heroes[index];
-              final inList    = MovieActionService().getAction(movie.id)?.watchLater ?? false;
-              return _HeroSlide(
-                movie:   movie,
-                inList:  inList,
-                onPlay:  () => _openMovie(movie),
-                onAdd:   () => _toggleWatchLaterHero(movie),
-              );
+              final movie = heroes[index];
+              final inList = MovieActionService().getAction(movie.id)?.watchLater ?? false;
+              return _HeroSlide(movie: movie, inList: inList, onPlay: () => _openMovie(movie), onAdd: () => _toggleWatchLaterHero(movie));
             },
           ),
           Positioned(
@@ -333,7 +323,7 @@ class _HomePageState extends State<HomePage> {
                 return AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
                   margin: const EdgeInsets.symmetric(horizontal: 3),
-                  width:  active ? 20 : 6,
+                  width: active ? 20 : 6,
                   height: 4,
                   decoration: BoxDecoration(
                     color: active ? Colors.white : const Color(0xFF555555),
@@ -356,30 +346,14 @@ class _HomePageState extends State<HomePage> {
           padding: const EdgeInsets.fromLTRB(20, 28, 20, 12),
           child: Row(
             children: [
-              const Text(
-                'À voir plus tard',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.2,
-                ),
-              ),
+              const Text('À voir plus tard',
+                  style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700, letterSpacing: 0.2)),
               const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2A2A2A),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  '${_watchLater.length}',
-                  style: const TextStyle(
-                    color: Color(0xFF888888),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                decoration: BoxDecoration(color: const Color(0xFF2A2A2A), borderRadius: BorderRadius.circular(20)),
+                child: Text('${_watchLater.length}',
+                    style: const TextStyle(color: Color(0xFF888888), fontSize: 11, fontWeight: FontWeight.w600)),
               ),
             ],
           ),
@@ -396,23 +370,19 @@ class _HomePageState extends State<HomePage> {
                 action: action,
                 onTap: () async {
                   final movie = Movie(
-                    id:          action.movieId,
-                    title:       action.movieTitle,
-                    posterPath:  action.posterPath,
+                    id: action.movieId,
+                    title: action.movieTitle,
+                    posterPath: action.posterPath,
                     backdropPath: '',
-                    overview:    '',
+                    overview: '',
                     releaseDate: '',
                     voteAverage: 0,
-                    genres:    [],
+                    genres: [],
                   );
                   await _openMovie(movie);
                 },
                 onRemove: () {
-                  MovieActionService().toggleWatchLater(
-                    action.movieId,
-                    action.movieTitle,
-                    action.posterPath,
-                  );
+                  MovieActionService().toggleWatchLater(action.movieId, action.movieTitle, action.posterPath);
                   _refreshWatchLater();
                 },
               );
@@ -423,33 +393,35 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildSection(String title, List<Movie> movies) {
-    if (movies.isEmpty) return const SizedBox.shrink();
+  Widget _buildSection(
+      String title,
+      _SectionState section,
+      Future<List<Movie>> Function(int) fetcher,
+      ) {
+    if (section.movies.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 28, 20, 12),
-          child: Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.2,
-            ),
-          ),
+          child: Text(title,
+              style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700, letterSpacing: 0.2)),
         ),
         SizedBox(
           height: 195,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: movies.length,
-            itemBuilder: (_, i) => _PosterCard(
-              movie: movies[i],
-              onTap: () => _openMovie(movies[i]),
-            ),
+            itemCount: section.movies.length + 1,
+            itemBuilder: (_, i) {
+              if (i == section.movies.length) {
+                return _LoadMoreButton(
+                  isLoadingMore: section.isLoadingMore,
+                  onTap: () => _loadMore(section, fetcher),
+                );
+              }
+              return _PosterCard(movie: section.movies[i], onTap: () => _openMovie(section.movies[i]));
+            },
           ),
         ),
       ],
@@ -457,18 +429,58 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
+class _LoadMoreButton extends StatelessWidget {
+  final bool isLoadingMore;
+  final VoidCallback onTap;
+
+  const _LoadMoreButton({required this.isLoadingMore, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 80,
+        margin: const EdgeInsets.only(right: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF111111),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFF222222)),
+        ),
+        child: Center(
+          child: isLoadingMore
+              ? const SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(
+                color: Colors.white54, strokeWidth: 2),
+          )
+              : const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.add_circle_outline_rounded,
+                  color: Colors.white38, size: 22),
+              SizedBox(height: 6),
+              Text('Suite',
+                  style: TextStyle(
+                      color: Colors.white38,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _HeroSlide extends StatelessWidget {
-  final Movie        movie;
-  final bool         inList;
+  final Movie movie;
+  final bool inList;
   final VoidCallback onPlay;
   final VoidCallback onAdd;
 
-  const _HeroSlide({
-    required this.movie,
-    required this.inList,
-    required this.onPlay,
-    required this.onAdd,
-  });
+  const _HeroSlide({required this.movie, required this.inList, required this.onPlay, required this.onAdd});
 
   @override
   Widget build(BuildContext context) {
@@ -478,62 +490,36 @@ class _HeroSlide extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           movie.posterPath.isNotEmpty
-              ? Image.network(
-            movie.posterUrl,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) =>
-                Container(color: const Color(0xFF1A1A1A)),
-          )
+              ? Image.network(movie.posterUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: const Color(0xFF1A1A1A)))
               : Container(color: const Color(0xFF1A1A1A)),
           const DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
-                end:   Alignment.bottomCenter,
-                colors: [
-                  Color(0x00000000),
-                  Color(0x55000000),
-                  Colors.black,
-                ],
+                end: Alignment.bottomCenter,
+                colors: [Color(0x00000000), Color(0x55000000), Colors.black],
                 stops: [0.35, 0.65, 1.0],
               ),
             ),
           ),
           Positioned(
             bottom: 36,
-            left:   20,
-            right:  20,
+            left: 20,
+            right: 20,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  movie.title,
-                  style: const TextStyle(
-                    color:       Colors.white,
-                    fontSize:    28,
-                    fontWeight:  FontWeight.w900,
-                    height:      1.1,
-                    shadows: [Shadow(color: Colors.black54, blurRadius: 8)],
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                Text(movie.title,
+                    style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900, height: 1.1,
+                        shadows: [Shadow(color: Colors.black54, blurRadius: 8)]),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 14),
                 Row(
                   children: [
-                    _HeroBtn(
-                      icon:   Icons.play_arrow_rounded,
-                      label:  'Regarder',
-                      filled: true,
-                      onTap:  onPlay,
-                    ),
+                    _HeroBtn(icon: Icons.play_arrow_rounded, label: 'Regarder', filled: true, onTap: onPlay),
                     const SizedBox(width: 10),
-                    _HeroBtn(
-                      icon:   inList ? Icons.check : Icons.add,
-                      label:  inList ? 'Dans ma liste' : 'Ma liste',
-                      filled: false,
-                      onTap:  onAdd,
-                    ),
+                    _HeroBtn(icon: inList ? Icons.check : Icons.add, label: inList ? 'Dans ma liste' : 'Ma liste', filled: false, onTap: onAdd),
                   ],
                 ),
               ],
@@ -546,17 +532,12 @@ class _HeroSlide extends StatelessWidget {
 }
 
 class _HeroBtn extends StatelessWidget {
-  final IconData     icon;
-  final String       label;
-  final bool         filled;
+  final IconData icon;
+  final String label;
+  final bool filled;
   final VoidCallback onTap;
 
-  const _HeroBtn({
-    required this.icon,
-    required this.label,
-    required this.filled,
-    required this.onTap,
-  });
+  const _HeroBtn({required this.icon, required this.label, required this.filled, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -565,7 +546,7 @@ class _HeroBtn extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
         decoration: BoxDecoration(
-          color:  filled ? Colors.white : Colors.transparent,
+          color: filled ? Colors.white : Colors.transparent,
           border: filled ? null : Border.all(color: Colors.white70, width: 1),
           borderRadius: BorderRadius.circular(6),
         ),
@@ -574,14 +555,7 @@ class _HeroBtn extends StatelessWidget {
           children: [
             Icon(icon, size: 17, color: filled ? Colors.black : Colors.white),
             const SizedBox(width: 5),
-            Text(
-              label,
-              style: TextStyle(
-                color:      filled ? Colors.black : Colors.white,
-                fontSize:   13,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            Text(label, style: TextStyle(color: filled ? Colors.black : Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
           ],
         ),
       ),
@@ -591,17 +565,10 @@ class _HeroBtn extends StatelessWidget {
 
 class _WatchLaterCard extends StatelessWidget {
   final UserMovieAction action;
-  final VoidCallback    onTap;
-  final VoidCallback    onRemove;
+  final VoidCallback onTap;
+  final VoidCallback onRemove;
 
-  const _WatchLaterCard({
-    required this.action,
-    required this.onTap,
-    required this.onRemove,
-  });
-
-  String get _posterUrl =>
-      'https://image.tmdb.org/t/p/w300${action.posterPath}';
+  const _WatchLaterCard({required this.action, required this.onTap, required this.onRemove});
 
   @override
   Widget build(BuildContext context) {
@@ -620,30 +587,19 @@ class _WatchLaterCard extends StatelessWidget {
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: action.posterPath.isNotEmpty
-                          ? Image.network(
-                        _posterUrl,
-                        fit:   BoxFit.cover,
-                        width: 110,
-                        errorBuilder: (_, __, ___) => _placeholder(),
-                      )
+                          ? Image.network('https://image.tmdb.org/t/p/w300${action.posterPath}',
+                          fit: BoxFit.cover, width: 110, errorBuilder: (_, __, ___) => _placeholder())
                           : _placeholder(),
                     ),
                     Positioned(
-                      top:   4,
+                      top: 4,
                       right: 4,
                       child: GestureDetector(
                         onTap: onRemove,
                         child: Container(
                           padding: const EdgeInsets.all(3),
-                          decoration: const BoxDecoration(
-                            color:  Colors.black54,
-                            shape:  BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.close,
-                            color: Colors.white,
-                            size:  12,
-                          ),
+                          decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                          child: const Icon(Icons.close, color: Colors.white, size: 12),
                         ),
                       ),
                     ),
@@ -651,21 +607,12 @@ class _WatchLaterCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 6),
-              Text(
-                action.movieTitle,
-                style: const TextStyle(
-                  color:      Color(0xFFDDDDDD),
-                  fontSize:   11,
-                  fontWeight: FontWeight.w500,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+              Text(action.movieTitle,
+                  style: const TextStyle(color: Color(0xFFDDDDDD), fontSize: 11, fontWeight: FontWeight.w500),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
               const SizedBox(height: 2),
-              const Text(
-                'À revoir',
-                style: TextStyle(color: Color(0xFF666666), fontSize: 10),
-              ),
+              const Text('À revoir', style: TextStyle(color: Color(0xFF666666), fontSize: 10)),
             ],
           ),
         ),
@@ -673,16 +620,11 @@ class _WatchLaterCard extends StatelessWidget {
     );
   }
 
-  Widget _placeholder() => Container(
-    color: const Color(0xFF1A1A1A),
-    child: const Center(
-      child: Icon(Icons.movie, color: Color(0xFF333333), size: 28),
-    ),
-  );
+  Widget _placeholder() => Container(color: const Color(0xFF1A1A1A), child: const Center(child: Icon(Icons.movie, color: Color(0xFF333333), size: 28)));
 }
 
 class _PosterCard extends StatelessWidget {
-  final Movie        movie;
+  final Movie movie;
   final VoidCallback onTap;
 
   const _PosterCard({required this.movie, required this.onTap});
@@ -702,37 +644,21 @@ class _PosterCard extends StatelessWidget {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: movie.posterPath.isNotEmpty
-                      ? Image.network(
-                    movie.posterUrl,
-                    fit:   BoxFit.cover,
-                    width: 110,
-                    errorBuilder: (_, __, ___) => _placeholder(),
-                  )
+                      ? Image.network(movie.posterUrl, fit: BoxFit.cover, width: 110, errorBuilder: (_, __, ___) => _placeholder())
                       : _placeholder(),
                 ),
               ),
               const SizedBox(height: 6),
-              Text(
-                movie.title,
-                style: const TextStyle(
-                  color:      Color(0xFFDDDDDD),
-                  fontSize:   11,
-                  fontWeight: FontWeight.w500,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+              Text(movie.title,
+                  style: const TextStyle(color: Color(0xFFDDDDDD), fontSize: 11, fontWeight: FontWeight.w500),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
               const SizedBox(height: 2),
               Row(
                 children: [
-                  const Icon(Icons.star_rounded,
-                      color: Color(0xFFFFD700), size: 10),
+                  const Icon(Icons.star_rounded, color: Color(0xFFFFD700), size: 10),
                   const SizedBox(width: 3),
-                  Text(
-                    movie.voteAverage.toStringAsFixed(1),
-                    style: const TextStyle(
-                        color: Color(0xFF777777), fontSize: 10),
-                  ),
+                  Text(movie.voteAverage.toStringAsFixed(1), style: const TextStyle(color: Color(0xFF777777), fontSize: 10)),
                 ],
               ),
             ],
@@ -742,10 +668,5 @@ class _PosterCard extends StatelessWidget {
     );
   }
 
-  Widget _placeholder() => Container(
-    color: const Color(0xFF1A1A1A),
-    child: const Center(
-      child: Icon(Icons.movie, color: Color(0xFF333333), size: 28),
-    ),
-  );
+  Widget _placeholder() => Container(color: const Color(0xFF1A1A1A), child: const Center(child: Icon(Icons.movie, color: Color(0xFF333333), size: 28)));
 }

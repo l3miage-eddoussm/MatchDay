@@ -7,6 +7,11 @@ class UserMovieAction {
   final String? review;
   final bool quizCompleted;
   final TrophyLevel? trophy;
+  final DateTime? ratedAt;
+  final int? releaseYear;
+  final List<String> genres;
+  final List<String> directors;
+  final List<String> topActors;
 
   static const _undefined = Object();
 
@@ -19,6 +24,11 @@ class UserMovieAction {
     this.review,
     this.quizCompleted = false,
     this.trophy,
+    this.ratedAt,
+    this.releaseYear,
+    this.genres = const [],
+    this.directors = const [],
+    this.topActors = const [],
   });
 
   factory UserMovieAction.fromJson(Map<String, dynamic> json) =>
@@ -38,6 +48,19 @@ class UserMovieAction {
           orElse: () => TrophyLevel.bronze,
         )
             : null,
+        ratedAt: json['ratedAt'] != null
+            ? DateTime.tryParse(json['ratedAt'])
+            : null,
+        releaseYear: json['releaseYear'] as int?,
+        genres: (json['genres'] as List<dynamic>? ?? [])
+            .map((e) => e.toString())
+            .toList(),
+        directors: (json['directors'] as List<dynamic>? ?? [])
+            .map((e) => e.toString())
+            .toList(),
+        topActors: (json['topActors'] as List<dynamic>? ?? [])
+            .map((e) => e.toString())
+            .toList(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -49,6 +72,11 @@ class UserMovieAction {
     'review': review,
     'quizCompleted': quizCompleted,
     'trophy': trophy?.name,
+    'ratedAt': ratedAt?.toIso8601String(),
+    'releaseYear': releaseYear,
+    'genres': genres,
+    'directors': directors,
+    'topActors': topActors,
   };
 
   UserMovieAction copyWith({
@@ -57,6 +85,11 @@ class UserMovieAction {
     Object? review = _undefined,
     bool? quizCompleted,
     Object? trophy = _undefined,
+    Object? ratedAt = _undefined,
+    Object? releaseYear = _undefined,
+    List<String>? genres,
+    List<String>? directors,
+    List<String>? topActors,
   }) =>
       UserMovieAction(
         movieId: movieId,
@@ -69,9 +102,20 @@ class UserMovieAction {
         trophy: identical(trophy, _undefined)
             ? this.trophy
             : trophy as TrophyLevel?,
+        ratedAt: identical(ratedAt, _undefined)
+            ? this.ratedAt
+            : ratedAt as DateTime?,
+        releaseYear: identical(releaseYear, _undefined)
+            ? this.releaseYear
+            : releaseYear as int?,
+        genres: genres ?? this.genres,
+        directors: directors ?? this.directors,
+        topActors: topActors ?? this.topActors,
       );
 
   bool get hasReview => review != null && review!.trim().isNotEmpty;
+
+  int get ratedYear => ratedAt?.year ?? DateTime.now().year;
 }
 
 enum TrophyLevel { bronze, silver, gold, platinum }
