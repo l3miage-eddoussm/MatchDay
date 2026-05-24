@@ -113,6 +113,36 @@ class MovieActionService {
     _saveAll(all);
   }
 
+  void saveQuizResult(
+      int movieId,
+      String title,
+      String posterPath,
+      TrophyLevel? trophy,
+      ) {
+    final all = _getAll();
+    final existing = all[movieId];
+    if (existing != null) {
+      all[movieId] = existing.copyWith(
+        quizCompleted: true,
+        trophy: trophy,
+      );
+    } else {
+      all[movieId] = UserMovieAction(
+        movieId: movieId,
+        movieTitle: title,
+        posterPath: posterPath,
+        quizCompleted: true,
+        trophy: trophy,
+      );
+    }
+    _saveAll(all);
+  }
+
+  List<UserMovieAction> getTrophies() => _getAll()
+      .values
+      .where((a) => a.quizCompleted && a.trophy != null)
+      .toList();
+
   List<UserMovieAction> getWatchLaterList() =>
       _getAll().values.where((a) => a.watchLater).toList();
 

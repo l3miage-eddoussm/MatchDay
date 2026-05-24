@@ -19,6 +19,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:share_plus/share_plus.dart';
 import 'collection_page.dart';
+import 'trivia_quiz_page.dart';
 
 class MovieDetailPage extends StatefulWidget {
   final Movie movie;
@@ -45,6 +46,130 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
   void initState() {
     super.initState();
     _loadDetails();
+  }
+
+  Future<void> _openQuiz() async {
+    final movie = _details ?? widget.movie;
+
+    if (_userAction?.quizCompleted == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tu as déjà complété le quiz pour ce film.'),
+          backgroundColor: Color(0xFF1A1A1A),
+        ),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: const Color(0xFF141414),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Quiz Trivia',
+          style: TextStyle(
+              color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800),
+        ),
+        content: const Text(
+          'Tu ne pourras passer ce quiz qu\'une seule fois.\n\nSelon ton score, tu débloques des avatars basés sur les personnages du film.\n\nBonne chance !',
+          style: TextStyle(color: Color(0xFF888888), fontSize: 13, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Annuler',
+                style: TextStyle(color: Color(0xFF666666))),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Commencer',
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TriviaQuizPage(movie: movie, cast: _cast),
+      ),
+    );
+
+    final updated = MovieActionService().getAction(movie.id);
+    if (mounted) setState(() => _userAction = updated);
+  }
+
+  Widget _buildQuizButton() {
+    final completed = _userAction?.quizCompleted ?? false;
+    final trophy = _userAction?.trophy;
+
+    return GestureDetector(
+      onTap: completed ? null : _openQuiz,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: completed ? const Color(0xFF0D0D0D) : const Color(0xFF141414),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: trophy != null
+                ? Color(trophy.color).withOpacity(0.4)
+                : completed
+                ? const Color(0xFF1E1E1E)
+                : Colors.white.withOpacity(0.15),
+          ),
+        ),
+        child: Row(
+          children: [
+            Text(
+              completed
+                  ? (trophy?.emoji ?? '🎬')
+                  : '🏆',
+              style: const TextStyle(fontSize: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    completed
+                        ? trophy != null
+                        ? 'Trophée ${trophy.label} obtenu'
+                        : 'Quiz complété'
+                        : 'Quiz Trivia',
+                    style: TextStyle(
+                      color: trophy != null
+                          ? Color(trophy.color)
+                          : Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    completed
+                        ? '10 questions · tentative utilisée'
+                        : '10 questions · 1 seule tentative · trophée à gagner',
+                    style: const TextStyle(
+                      color: Color(0xFF555555),
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (!completed)
+              const Icon(Icons.chevron_right_rounded,
+                  color: Colors.white24, size: 20),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildCollectionButton(Movie movie) {
@@ -513,6 +638,8 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                         if (_userAction?.rating != null) ...[
                           const SizedBox(height: 24),
                           _buildMyReview(),
+                          const SizedBox(height: 16),
+                          _buildQuizButton(),
                         ],
                       ],
                     ),

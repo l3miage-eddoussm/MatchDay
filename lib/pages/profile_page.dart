@@ -22,7 +22,7 @@ class _ProfilePageState extends State<ProfilePage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _refresh();
   }
 
@@ -38,6 +38,95 @@ class _ProfilePageState extends State<ProfilePage>
       _rated      = MovieActionService().getRatedMovies()
         ..sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
     });
+  }
+  Widget _buildTrophiesTab() {
+    final trophies = MovieActionService().getTrophies();
+
+    if (trophies.isEmpty) {
+      return const _EmptyState(
+        icon: Icons.emoji_events_outlined,
+        title: 'Aucun trophée',
+        subtitle: 'Complète des quiz trivia pour gagner des trophées.',
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+      itemCount: trophies.length,
+      itemBuilder: (_, i) {
+        final action = trophies[i];
+        final trophy = action.trophy!;
+        final trophyColor = Color(trophy.color);
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFF111111),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: trophyColor.withOpacity(0.25)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: trophyColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                      color: trophyColor.withOpacity(0.3)),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  trophy.emoji,
+                  style: const TextStyle(fontSize: 24),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      action.movieTitle,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Trophée ${trophy.label}',
+                      style: TextStyle(
+                        color: trophyColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: action.posterPath.isNotEmpty
+                    ? Image.network(
+                  'https://image.tmdb.org/t/p/w200${action.posterPath}',
+                  width: 36,
+                  height: 52,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const SizedBox(),
+                )
+                    : const SizedBox(),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _openMovie(UserMovieAction action) async {
@@ -77,6 +166,7 @@ class _ProfilePageState extends State<ProfilePage>
               children: [
                 _buildWatchLaterTab(),
                 _buildRatedTab(),
+                _buildTrophiesTab(),
               ],
             ),
           ),
@@ -184,25 +274,23 @@ class _ProfilePageState extends State<ProfilePage>
     final avgRating = _rated.isEmpty
         ? 0.0
         : _rated.fold(0.0, (sum, a) => sum + (a.rating ?? 0)) / _rated.length;
+    final trophyCount = MovieActionService().getTrophies().length;
 
     return Container(
-      margin:  const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       padding: const EdgeInsets.symmetric(vertical: 20),
       decoration: BoxDecoration(
-        color:        const Color(0xFF111111),
+        color: const Color(0xFF111111),
         borderRadius: BorderRadius.circular(14),
-        border:       Border.all(color: const Color(0xFF1E1E1E)),
+        border: Border.all(color: const Color(0xFF1E1E1E)),
       ),
       child: Row(
         children: [
           _StatItem(value: '${_watchLater.length}', label: 'À revoir'),
           _StatDivider(),
-          _StatItem(value: '${_rated.length}',      label: 'Notés'),
+          _StatItem(value: '${_rated.length}', label: 'Notés'),
           _StatDivider(),
-          _StatItem(
-            value: _rated.isEmpty ? '—' : avgRating.toStringAsFixed(1),
-            label: 'Moy. notes',
-          ),
+          _StatItem(value: '$trophyCount', label: 'Trophées'),
         ],
       ),
     );
@@ -249,6 +337,16 @@ class _ProfilePageState extends State<ProfilePage>
                   const Icon(Icons.star_outline_rounded, size: 15),
                   const SizedBox(width: 6),
                   Text('Notés (${_rated.length})'),
+                ],
+              ),
+            ),
+            Tab(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.emoji_events_outlined, size: 15),
+                  const SizedBox(width: 6),
+                  const Text('Trophées'),
                 ],
               ),
             ),
