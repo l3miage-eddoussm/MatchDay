@@ -1,6 +1,12 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:screenshot/screenshot.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../constants.dart';
 import '../models/movie.dart';
+import '../models/movie_credits.dart';
 import '../models/movie_detail.dart';
 import '../models/user_movie_action.dart';
 import '../services/auth_service.dart';
@@ -14,10 +20,6 @@ import '../widgets/rating_bottom_sheet.dart';
 import '../widgets/section_title.dart';
 import '../widgets/similar_movies_section.dart';
 import '../widgets/video_section.dart';
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
-import 'package:screenshot/screenshot.dart';
-import 'package:share_plus/share_plus.dart';
 import 'collection_page.dart';
 import 'trivia_quiz_page.dart';
 
@@ -32,20 +34,106 @@ class MovieDetailPage extends StatefulWidget {
 
 class _MovieDetailPageState extends State<MovieDetailPage> {
   UserMovieAction? _userAction;
-  Movie? _details;
-  List<MovieVideo> _videos = [];
-  List<String> _imageUrls = [];
-  List<CastMember> _cast = [];
-  List<CrewMember> _directors = [];
-  List<Movie> _similar = [];
-  bool _isLoading = true;
-  String _username = '';
+  Movie?           _details;
+  List<MovieVideo> _videos    = [];
+  List<String>     _imageUrls = [];
+  MovieCredits     _credits   = const MovieCredits(cast: [], directors: []);
+  List<Movie>      _similar   = [];
+  bool             _isLoading = true;
+  String           _username  = '';
+
   final ScreenshotController _screenshotController = ScreenshotController();
 
   @override
   void initState() {
     super.initState();
     _loadDetails();
+  }
+
+  Future<void> _loadDetails() async {
+    try {
+      final id      = widget.movie.id;
+      final results = await Future.wait([
+        MovieService().getMovieDetails(id),
+        MovieService().getMovieVideos(id),
+        MovieService().getMovieImages(id),
+        MovieService().getMovieCredits(id),
+        MovieService().getSimilarMovies(id),
+      ]);
+
+      final userAction  = MovieActionService().getAction(id);
+      final currentUser = await AuthService().getCurrentUser();
+
+      if (!mounted) return;
+      setState(() {
+        _details   = results[0] as Movie;
+        _videos    = results[1] as List<MovieVideo>;
+        _imageUrls = (results[2] as List<MovieImage>)
+            .map((img) => img.imageUrl)
+            .toList();
+        _credits   = results[3] as MovieCredits;
+        _similar   = results[4] as List<Movie>;
+        _userAction = userAction;
+        _username   = currentUser != null
+            ? '${currentUser.firstName} ${currentUser.lastName}'
+            : '';
+        _isLoading  = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _openTrailer(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Future<void> _toggleWatchLater() async {
+    final movie = _details ?? widget.movie;
+    MovieActionService().toggleWatchLater(
+        movie.id, movie.title, movie.posterPath);
+    final updated = MovieActionService().getAction(movie.id);
+    if (mounted) setState(() => _userAction = updated);
+  }
+
+  Future<void> _openRatingSheet() async {
+    final movie       = _details ?? widget.movie;
+    final releaseYear = movie.releaseDate.length >= 4
+        ? int.tryParse(movie.releaseDate.substring(0, 4))
+        : null;
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => RatingBottomSheet(
+        initialRating:  _userAction?.rating,
+        initialReview:  _userAction?.review,
+        onRate: (rating, review) {
+          MovieActionService().rateMovie(
+            movie.id,
+            movie.title,
+            movie.posterPath,
+            rating,
+            review:      review,
+            releaseYear: releaseYear,
+            genres:      List<String>.from(movie.genres),
+            directors:   _credits.directors,
+            cast:        _credits.cast,
+          );
+          final updated = MovieActionService().getAction(movie.id);
+          if (mounted) setState(() => _userAction = updated);
+        },
+        onRemove: () {
+          MovieActionService().removeRating(movie.id);
+          final updated = MovieActionService().getAction(movie.id);
+          if (mounted) setState(() => _userAction = updated);
+        },
+      ),
+    );
   }
 
   Future<void> _openQuiz() async {
@@ -63,39 +151,14 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF141414),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Quiz Trivia',
-          style: TextStyle(
-              color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800),
-        ),
-        content: const Text(
-          'Tu ne pourras passer ce quiz qu\'une seule fois.\n\nSelon ton score, tu débloques des avatars basés sur les personnages du film.\n\nBonne chance !',
-          style: TextStyle(color: Color(0xFF888888), fontSize: 13, height: 1.5),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Annuler',
-                style: TextStyle(color: Color(0xFF666666))),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Commencer',
-                style: TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.w700)),
-          ),
-        ],
-      ),
+      builder: (_) => const _QuizConfirmDialog(),
     );
-
     if (confirmed != true) return;
 
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => TriviaQuizPage(movie: movie, cast: _cast),
+        builder: (_) =>
+            TriviaQuizPage(movie: movie, cast: _credits.cast),
       ),
     );
 
@@ -103,17 +166,261 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
     if (mounted) setState(() => _userAction = updated);
   }
 
-  Widget _buildQuizButton() {
-    final completed = _userAction?.quizCompleted ?? false;
-    final trophy = _userAction?.trophy;
+  Future<void> _shareReview() async {
+    final movie = _details ?? widget.movie;
+    try {
+      final imageBytes =
+      await _screenshotController.capture(pixelRatio: 3.0);
+      if (imageBytes == null) return;
+      final dir  = await getTemporaryDirectory();
+      final file = File('${dir.path}/critique_${movie.id}.png');
+      await file.writeAsBytes(imageBytes);
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: 'Ma critique de "${movie.title}" sur CINEART',
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Impossible de générer la carte.'),
+          backgroundColor: Color(0xFF1A1A1A),
+        ),
+      );
+    }
+  }
 
+  @override
+  Widget build(BuildContext context) {
+    final movie = _details ?? widget.movie;
+
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: Colors.black,
+          body: _isLoading
+              ? const Center(
+            child: CircularProgressIndicator(
+                color: Colors.white, strokeWidth: 2),
+          )
+              : CustomScrollView(
+            slivers: [
+              _buildAppBar(movie),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding:
+                  const EdgeInsets.fromLTRB(20, 8, 20, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      MovieInfoHeader(
+                        movie:     movie,
+                        directors: _credits.directors,
+                      ),
+                      const SizedBox(height: 20),
+                      if (movie.belongsToCollection != null) ...[
+                        _CollectionButton(movie: movie),
+                        const SizedBox(height: 12),
+                      ],
+                      ActionButtons(
+                        userAction:     _userAction,
+                        onRatingTap:    _openRatingSheet,
+                        onWatchLaterTap: _toggleWatchLater,
+                      ),
+                      if (_userAction?.rating != null) ...[
+                        const SizedBox(height: 24),
+                        _MyReview(
+                          userAction:  _userAction!,
+                          onModify:    _openRatingSheet,
+                          onShare:     _shareReview,
+                        ),
+                        const SizedBox(height: 16),
+                        _QuizButton(
+                          userAction: _userAction,
+                          onTap:      _openQuiz,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              if (_credits.cast.isNotEmpty) ...[
+                SliverToBoxAdapter(
+                    child: SectionTitle(title: 'Casting')),
+                SliverToBoxAdapter(
+                    child: CastSection(cast: _credits.cast)),
+              ],
+              if (_videos.isNotEmpty) ...[
+                SliverToBoxAdapter(
+                    child: SectionTitle(title: 'Vidéos')),
+                SliverToBoxAdapter(
+                  child: VideoSection(
+                    videos: _videos,
+                    onTap:  _openTrailer,
+                  ),
+                ),
+              ],
+              if (_imageUrls.isNotEmpty) ...[
+                SliverToBoxAdapter(
+                    child: SectionTitle(title: 'Images')),
+                SliverToBoxAdapter(
+                  child: ImagesSection(imageUrls: _imageUrls),
+                ),
+              ],
+              if (_similar.isNotEmpty) ...[
+                SliverToBoxAdapter(
+                    child: SectionTitle(
+                        title: 'Films similaires')),
+                SliverToBoxAdapter(
+                  child: SimilarMoviesSection(movies: _similar),
+                ),
+              ],
+              const SliverToBoxAdapter(
+                  child: SizedBox(height: 40)),
+            ],
+          ),
+        ),
+        Positioned(
+          left: -2000,
+          top: 0,
+          child: Screenshot(
+            controller: _screenshotController,
+            child: _ShareCard(
+              movie:    movie,
+              username: _username,
+              rating:   _userAction?.rating?.toInt() ?? 0,
+              review:   _userAction?.review ?? '',
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAppBar(Movie movie) {
+    return SliverAppBar(
+      expandedHeight: 420,
+      pinned: true,
+      backgroundColor: Colors.black,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+        onPressed: () => Navigator.of(context).pop(),
+      ),
+      flexibleSpace: FlexibleSpaceBar(
+        background: Hero(
+          tag: 'poster-${widget.movie.id}',
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              movie.posterPath.isNotEmpty
+                  ? Image.network(
+                movie.posterUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    Container(color: const Color(0xFF1A1A1A)),
+              )
+                  : Container(color: const Color(0xFF1A1A1A)),
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, Colors.black],
+                    stops: [0.5, 1.0],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+class _CollectionButton extends StatelessWidget {
+  final Movie movie;
+  const _CollectionButton({required this.movie});
+
+  @override
+  Widget build(BuildContext context) {
+    final collection = movie.belongsToCollection!;
     return GestureDetector(
-      onTap: completed ? null : _openQuiz,
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+            builder: (_) => CollectionPage(currentMovie: movie)),
+      ),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding:
+        const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: completed ? const Color(0xFF0D0D0D) : const Color(0xFF141414),
+          color: const Color(0xFF141414),
+          borderRadius: BorderRadius.circular(12),
+          border:
+          Border.all(color: Colors.white.withOpacity(0.1)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.collections_bookmark_rounded,
+                color: Colors.white54, size: 18),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "FAIT PARTIE D'UNE COLLECTION",
+                    style: TextStyle(
+                      color: Colors.white38,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    collection.name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded,
+                color: Colors.white24, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuizButton extends StatelessWidget {
+  final UserMovieAction? userAction;
+  final VoidCallback onTap;
+
+  const _QuizButton({required this.userAction, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final completed = userAction?.quizCompleted ?? false;
+    final trophy    = userAction?.trophy;
+
+    return GestureDetector(
+      onTap: completed ? null : onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(
+            horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: completed
+              ? const Color(0xFF0D0D0D)
+              : const Color(0xFF141414),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: trophy != null
@@ -126,9 +433,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
         child: Row(
           children: [
             Text(
-              completed
-                  ? (trophy?.emoji ?? '🎬')
-                  : '🏆',
+              completed ? (trophy?.emoji ?? '🎬') : '🏆',
               style: const TextStyle(fontSize: 20),
             ),
             const SizedBox(width: 12),
@@ -171,90 +476,143 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
       ),
     );
   }
+}
 
-  Widget _buildCollectionButton(Movie movie) {
-    final collection = movie.belongsToCollection!;
-    return GestureDetector(
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => CollectionPage(currentMovie: movie),
-          ),
-        );
-      },
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF141414),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
-        ),
-        child: Row(
+class _MyReview extends StatelessWidget {
+  final UserMovieAction userAction;
+  final VoidCallback onModify;
+  final VoidCallback onShare;
+
+  const _MyReview({
+    required this.userAction,
+    required this.onModify,
+    required this.onShare,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasReview = userAction.hasReview ?? false;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
           children: [
-            const Icon(Icons.collections_bookmark_rounded,
-                color: Colors.white54, size: 18),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            const Text(
+              'Ma critique',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.5,
+              ),
+            ),
+            const Spacer(),
+            GestureDetector(
+              onTap: onModify,
+              child: const Text(
+                'Modifier',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (hasReview) ...[
+          GestureDetector(
+            onTap: onShare,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                    color: Colors.white.withOpacity(0.4)),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text(
-                    'FAIT PARTIE D\'UNE COLLECTION',
-                    style: TextStyle(
-                      color: Colors.white38,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
+                  Icon(Icons.ios_share_rounded,
+                      color: Colors.white, size: 15),
+                  SizedBox(width: 7),
                   Text(
-                    collection.name,
-                    style: const TextStyle(
+                    'Partager ma critique',
+                    style: TextStyle(
                       color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded,
-                color: Colors.white24, size: 20),
-          ],
-        ),
-      ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFF111111),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFF2A2A2A)),
+            ),
+            child: Text(
+              userAction.review!,
+              style: const TextStyle(
+                color: Color(0xFFAAAAAA),
+                fontSize: 14,
+                height: 1.6,
+              ),
+            ),
+          ),
+        ] else
+          GestureDetector(
+            onTap: onModify,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFF111111),
+                borderRadius: BorderRadius.circular(10),
+                border:
+                Border.all(color: const Color(0xFF2A2A2A)),
+              ),
+              child: const Text(
+                'Partager votre avis sur ce film...',
+                style: TextStyle(
+                  color: Color(0xFF444444),
+                  fontSize: 14,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
+}
 
-  Future<void> _shareReview() async {
-    final movie = _details ?? widget.movie;
-    try {
-      final imageBytes = await _screenshotController.capture(pixelRatio: 3.0);
-      if (imageBytes == null) return;
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/critique_${movie.id}.png');
-      await file.writeAsBytes(imageBytes);
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        text: 'Ma critique de "${movie.title}" sur CINEART',
-      );
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Impossible de générer la carte.'),
-          backgroundColor: Color(0xFF1A1A1A),
-        ),
-      );
-    }
-  }
+class _ShareCard extends StatelessWidget {
+  final Movie  movie;
+  final String username;
+  final int    rating;
+  final String review;
 
-  Widget _buildShareCard(Movie movie) {
-    final review = _userAction?.review ?? '';
-    final rating = _userAction?.rating?.toInt() ?? 0;
+  const _ShareCard({
+    required this.movie,
+    required this.username,
+    required this.rating,
+    required this.review,
+  });
 
+  @override
+  Widget build(BuildContext context) {
     return Material(
       type: MaterialType.transparency,
       child: SizedBox(
@@ -265,7 +623,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
           children: [
             movie.posterPath.isNotEmpty
                 ? Image.network(
-              'https://image.tmdb.org/t/p/w500${movie.posterPath}',
+              '${AppConstants.tmdbImageBaseUrl}/w500${movie.posterPath}',
               fit: BoxFit.cover,
             )
                 : Container(color: const Color(0xFF1A1A1A)),
@@ -354,7 +712,6 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                   ),
                   const SizedBox(height: 18),
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Container(
                         width: 32,
@@ -362,12 +719,13 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                         decoration: BoxDecoration(
                           color: const Color(0xFF2A2A2A),
                           shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white24),
+                          border:
+                          Border.all(color: Colors.white24),
                         ),
                         alignment: Alignment.center,
                         child: Text(
-                          _username.isNotEmpty
-                              ? _username[0].toUpperCase()
+                          username.isNotEmpty
+                              ? username[0].toUpperCase()
                               : '?',
                           style: const TextStyle(
                             color: Colors.white,
@@ -380,7 +738,7 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          _username,
+                          username,
                           style: const TextStyle(
                             color: Colors.white70,
                             fontSize: 13,
@@ -410,339 +768,43 @@ class _MovieDetailPageState extends State<MovieDetailPage> {
       ),
     );
   }
+}
 
-  Future<void> _loadDetails() async {
-    try {
-      final id = widget.movie.id;
-      final results = await Future.wait([
-        MovieService().getMovieDetails(id),
-        MovieService().getMovieVideos(id),
-        MovieService().getMovieImages(id),
-        MovieService().getMovieCredits(id),
-        MovieService().getSimilarMovies(id),
-      ]);
-
-      final userAction = MovieActionService().getAction(id);
-      final currentUser = await AuthService().getCurrentUser();
-
-      setState(() {
-        _details = results[0] as Movie;
-        _videos = results[1] as List<MovieVideo>;
-        _imageUrls = (results[2] as List<MovieImage>)
-            .map((img) => img.imageUrl)
-            .toList();
-        final credits = results[3] as Map<String, dynamic>;
-        _cast = credits['cast'] as List<CastMember>;
-        _directors = credits['crew'] as List<CrewMember>;
-        _similar = results[4] as List<Movie>;
-        _userAction = userAction;
-        _username = currentUser != null
-            ? '${currentUser.firstName} ${currentUser.lastName}'
-            : '';
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  Widget _buildMyReview() {
-    final hasReview = _userAction?.hasReview ?? false;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const Text(
-              'Ma critique',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.5,
-              ),
-            ),
-            const Spacer(),
-            GestureDetector(
-              onTap: _openRatingSheet,
-              child: const Text(
-                'Modifier',
-                style: TextStyle(
-                  color: Color(0xFFFFFFFF),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        if (hasReview) ...[
-          GestureDetector(
-            onTap: _shareReview,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFFFFF).withOpacity(0.12),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                    color: const Color(0xFFFAFAFA).withOpacity(0.4)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Icon(Icons.ios_share_rounded,
-                      color: Color(0xFFFFFFFF), size: 15),
-                  SizedBox(width: 7),
-                  Text(
-                    'Partager ma critique',
-                    style: TextStyle(
-                      color: Color(0xFFFFFFFF),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFF111111),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFF2A2A2A)),
-            ),
-            child: Text(
-              _userAction!.review!,
-              style: const TextStyle(
-                color: Color(0xFFAAAAAA),
-                fontSize: 14,
-                height: 1.6,
-              ),
-            ),
-          ),
-        ] else
-          GestureDetector(
-            onTap: _openRatingSheet,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFF111111),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF2A2A2A)),
-              ),
-              child: const Text(
-                'Partager votre avis sur ce film...',
-                style: TextStyle(
-                  color: Color(0xFF444444),
-                  fontSize: 14,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Future<void> _openTrailer(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
-  }
-
-  Future<void> _openRatingSheet() async {
-    final movie = _details ?? widget.movie;
-
-    int? releaseYear;
-    if (movie.releaseDate.length >= 4) {
-      releaseYear = int.tryParse(movie.releaseDate.substring(0, 4));
-    }
-
-    final genreNames = List<String>.from(movie.genres);
-
-    await showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => RatingBottomSheet(
-        initialRating: _userAction?.rating,
-        initialReview: _userAction?.review,
-        onRate: (rating, review) {
-          MovieActionService().rateMovie(
-            movie.id,
-            movie.title,
-            movie.posterPath,
-            rating,
-            review: review,
-            releaseYear: releaseYear,
-            genres: genreNames,
-            directors: _directors,
-            cast: _cast,
-          );
-          final updated = MovieActionService().getAction(movie.id);
-          if (mounted) setState(() => _userAction = updated);
-        },
-        onRemove: () {
-          MovieActionService().removeRating(movie.id);
-          final updated = MovieActionService().getAction(movie.id);
-          if (mounted) setState(() => _userAction = updated);
-        },
-      ),
-    );
-  }
-
-  Future<void> _toggleWatchLater() async {
-    final movie = _details ?? widget.movie;
-    MovieActionService().toggleWatchLater(
-        movie.id, movie.title, movie.posterPath);
-    final updated = MovieActionService().getAction(movie.id);
-    if (mounted) setState(() => _userAction = updated);
-  }
+class _QuizConfirmDialog extends StatelessWidget {
+  const _QuizConfirmDialog();
 
   @override
   Widget build(BuildContext context) {
-    final movie = _details ?? widget.movie;
-
-    return PopScope(
-      canPop: true,
-      child: Stack(
-        children: [
-          Scaffold(
-            backgroundColor: Colors.black,
-            body: _isLoading
-                ? const Center(
-              child: CircularProgressIndicator(
-                  color: Colors.white, strokeWidth: 2),
-            )
-                : CustomScrollView(
-              slivers: [
-                _buildAppBar(movie),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding:
-                    const EdgeInsets.fromLTRB(20, 8, 20, 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        MovieInfoHeader(
-                          movie: movie,
-                          directors: _directors,
-                        ),
-                        const SizedBox(height: 20),
-                        if (movie.belongsToCollection != null)
-                          _buildCollectionButton(movie),
-                        if (movie.belongsToCollection != null)
-                          const SizedBox(height: 12),
-                        ActionButtons(
-                          userAction: _userAction,
-                          onRatingTap: _openRatingSheet,
-                          onWatchLaterTap: _toggleWatchLater,
-                        ),
-                        if (_userAction?.rating != null) ...[
-                          const SizedBox(height: 24),
-                          _buildMyReview(),
-                          const SizedBox(height: 16),
-                          _buildQuizButton(),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-                if (_cast.isNotEmpty) ...[
-                  SliverToBoxAdapter(
-                      child: SectionTitle(title: 'Casting')),
-                  SliverToBoxAdapter(
-                      child: CastSection(cast: _cast)),
-                ],
-                if (_videos.isNotEmpty) ...[
-                  SliverToBoxAdapter(
-                      child: SectionTitle(title: 'Vidéos')),
-                  SliverToBoxAdapter(
-                    child: VideoSection(
-                      videos: _videos,
-                      onTap: _openTrailer,
-                    ),
-                  ),
-                ],
-                if (_imageUrls.isNotEmpty) ...[
-                  SliverToBoxAdapter(
-                      child: SectionTitle(title: 'Images')),
-                  SliverToBoxAdapter(
-                    child: ImagesSection(imageUrls: _imageUrls),
-                  ),
-                ],
-                if (_similar.isNotEmpty) ...[
-                  SliverToBoxAdapter(
-                      child:
-                      SectionTitle(title: 'Films similaires')),
-                  SliverToBoxAdapter(
-                    child: SimilarMoviesSection(movies: _similar),
-                  ),
-                ],
-                const SliverToBoxAdapter(
-                    child: SizedBox(height: 40)),
-              ],
-            ),
-          ),
-          Positioned(
-            left: -2000,
-            top: 0,
-            child: Screenshot(
-              controller: _screenshotController,
-              child: _buildShareCard(movie),
-            ),
-          ),
-        ],
+    return AlertDialog(
+      backgroundColor: const Color(0xFF141414),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16)),
+      title: const Text(
+        'Quiz Trivia',
+        style: TextStyle(
+            color: Colors.white,
+            fontSize: 17,
+            fontWeight: FontWeight.w800),
       ),
-    );
-  }
-
-  Widget _buildAppBar(Movie movie) {
-    return SliverAppBar(
-      expandedHeight: 420,
-      pinned: true,
-      backgroundColor: Colors.black,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-        onPressed: () => Navigator.of(context).pop(),
+      content: const Text(
+        "Tu ne pourras passer ce quiz qu'une seule fois.\n\nSelon ton score, tu débloques des avatars basés sur les personnages du film.\n\nBonne chance !",
+        style: TextStyle(
+            color: Color(0xFF888888), fontSize: 13, height: 1.5),
       ),
-      flexibleSpace: FlexibleSpaceBar(
-        background: Hero(
-          tag: 'poster-${widget.movie.id}',
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              movie.posterPath.isNotEmpty
-                  ? Image.network(
-                movie.posterUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) =>
-                    Container(color: const Color(0xFF1A1A1A)),
-              )
-                  : Container(color: const Color(0xFF1A1A1A)),
-              const DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Colors.transparent, Colors.black],
-                    stops: [0.5, 1.0],
-                  ),
-                ),
-              ),
-            ],
-          ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Annuler',
+              style: TextStyle(color: Color(0xFF666666))),
         ),
-      ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('Commencer',
+              style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700)),
+        ),
+      ],
     );
   }
 }

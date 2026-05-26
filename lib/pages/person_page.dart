@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../constants.dart';
 import '../models/person.dart';
 import '../models/movie.dart';
 import '../services/movie_service.dart';
@@ -23,13 +24,12 @@ class _PersonPageState extends State<PersonPage>
     with SingleTickerProviderStateMixin {
   Person? _person;
   bool _isLoading = true;
-  bool _bioExpanded = false;
   late TabController _tabController;
 
-  static const _red = Color(0xFFFF0000);
-  static const _surfaceColor = Color(0xFF111111);
-  static const _cardColor = Color(0xFF1A1A1A);
-  static const _mutedColor = Color(0xFF888888);
+  static const _red           = Color(0xFFFF0000);
+  static const _surfaceColor  = Color(0xFF111111);
+  static const _cardColor     = Color(0xFF1A1A1A);
+  static const _mutedColor    = Color(0xFF888888);
   static const _secondaryColor = Color(0xFFAAAAAA);
 
   @override
@@ -47,10 +47,11 @@ class _PersonPageState extends State<PersonPage>
 
   Future<void> _loadPerson() async {
     try {
-      final person = await MovieService().getPersonDetails(widget.personId);
+      final person =
+      await MovieService().getPersonDetails(widget.personId);
       if (mounted) {
         setState(() {
-          _person = person;
+          _person    = person;
           _isLoading = false;
         });
       }
@@ -59,13 +60,13 @@ class _PersonPageState extends State<PersonPage>
     }
   }
 
-  int _countSeenMovies(List<PersonMovie> credits) {
-    final ratedIds = MovieActionService()
-        .getRatedMovies()
-        .map((a) => a.movieId)
-        .toSet();
-    return credits.where((m) => ratedIds.contains(m.id)).length;
-  }
+  Set<int> get _ratedIds => MovieActionService()
+      .getRatedMovies()
+      .map((a) => a.movieId)
+      .toSet();
+
+  int _countSeen(List<PersonMovie> credits, Set<int> ratedIds) =>
+      credits.where((m) => ratedIds.contains(m.id)).length;
 
   @override
   Widget build(BuildContext context) {
@@ -77,38 +78,17 @@ class _PersonPageState extends State<PersonPage>
             color: Colors.white, strokeWidth: 2),
       )
           : _person == null
-          ? _buildError()
-          : _buildContent(),
+          ? _PersonErrorView(
+          onBack: () => Navigator.of(context).pop())
+          : _buildContent(_person!),
     );
   }
 
-  Widget _buildError() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.error_outline, color: _mutedColor, size: 48),
-          const SizedBox(height: 16),
-          const Text(
-            'Impossible de charger les informations.',
-            style: TextStyle(color: _mutedColor, fontSize: 14),
-          ),
-          const SizedBox(height: 20),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Retour',
-                style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildContent() {
-    final person = _person!;
-    final hasActing = person.actingCredits.isNotEmpty;
+  Widget _buildContent(Person person) {
+    final hasActing    = person.actingCredits.isNotEmpty;
     final hasDirecting = person.directingCredits.isNotEmpty;
-    final showTabs = hasActing && hasDirecting;
+    final showTabs     = hasActing && hasDirecting;
+    final ratedIds     = _ratedIds;
 
     return CustomScrollView(
       slivers: [
@@ -117,15 +97,43 @@ class _PersonPageState extends State<PersonPage>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildHeroSection(person),
-              _buildStats(person),
-              _buildPopularityBadge(person),
-              if (person.biography.isNotEmpty) _buildBiography(person),
+              _PersonHero(person: person),
+              _PersonStats(
+                person:   person,
+                ratedIds: ratedIds,
+                surfaceColor:   _surfaceColor,
+                mutedColor:     _mutedColor,
+                secondaryColor: _secondaryColor,
+              ),
+              _PopularityBadge(
+                  popularity: person.popularity,
+                  red: _red,
+                  mutedColor: _mutedColor),
+              if (person.biography.isNotEmpty)
+                _Biography(
+                    biography: person.biography,
+                    red: _red,
+                    secondaryColor: _secondaryColor),
               const SizedBox(height: 28),
               if (hasActing || hasDirecting)
                 showTabs
-                    ? _buildTabsSection(person)
-                    : _buildSingleFilmography(person),
+                    ? _FilmographyTabs(
+                  person:        person,
+                  tabController: _tabController,
+                  ratedIds:      ratedIds,
+                  red:           _red,
+                  mutedColor:    _mutedColor,
+                  cardColor:     _cardColor,
+                  countSeen:     _countSeen,
+                )
+                    : _SingleFilmography(
+                  person:    person,
+                  ratedIds:  ratedIds,
+                  red:       _red,
+                  mutedColor: _mutedColor,
+                  cardColor:  _cardColor,
+                  countSeen:  _countSeen,
+                ),
               const SizedBox(height: 40),
             ],
           ),
@@ -151,30 +159,69 @@ class _PersonPageState extends State<PersonPage>
       ),
     );
   }
+}
 
-  Widget _buildHeroSection(Person person) {
+class _PersonErrorView extends StatelessWidget {
+  final VoidCallback onBack;
+  static const _mutedColor = Color(0xFF888888);
+
+  const _PersonErrorView({required this.onBack});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error_outline,
+              color: _mutedColor, size: 48),
+          const SizedBox(height: 16),
+          const Text(
+            'Impossible de charger les informations.',
+            style: TextStyle(color: _mutedColor, fontSize: 14),
+          ),
+          const SizedBox(height: 20),
+          TextButton(
+            onPressed: onBack,
+            child: const Text('Retour',
+                style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PersonHero extends StatelessWidget {
+  final Person person;
+  static const _cardColor = Color(0xFF1A1A1A);
+  static const _red       = Color(0xFFFF0000);
+
+  const _PersonHero({required this.person});
+
+  @override
+  Widget build(BuildContext context) {
     return Stack(
       children: [
-        if (person.profilePath.isNotEmpty)
-          SizedBox(
-            height: 320,
-            width: double.infinity,
-            child: Image.network(
-              'https://image.tmdb.org/t/p/w780${person.profilePath}',
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) =>
-                  Container(height: 320, color: _cardColor),
-            ),
-          )
-        else
-          Container(
-            height: 320,
-            color: _cardColor,
-            child: const Center(
-              child:
-              Icon(Icons.person, color: Color(0xFF333333), size: 80),
-            ),
+        person.profilePath.isNotEmpty
+            ? SizedBox(
+          height: 320,
+          width: double.infinity,
+          child: Image.network(
+            '${AppConstants.tmdbImageBaseUrl}/w780${person.profilePath}',
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) =>
+                Container(height: 320, color: _cardColor),
           ),
+        )
+            : Container(
+          height: 320,
+          color: _cardColor,
+          child: const Center(
+            child: Icon(Icons.person,
+                color: Color(0xFF333333), size: 80),
+          ),
+        ),
         Positioned(
           bottom: 0,
           left: 0,
@@ -186,7 +233,6 @@ class _PersonPageState extends State<PersonPage>
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [Colors.transparent, Colors.black],
-                stops: [0.0, 1.0],
               ),
             ),
           ),
@@ -207,20 +253,28 @@ class _PersonPageState extends State<PersonPage>
                 ),
               ),
               const SizedBox(height: 6),
-              _buildDepartmentBadge(person),
+              _DepartmentBadge(person: person, red: _red),
             ],
           ),
         ),
       ],
     );
   }
+}
 
-  Widget _buildDepartmentBadge(Person person) {
+class _DepartmentBadge extends StatelessWidget {
+  final Person person;
+  final Color red;
+
+  const _DepartmentBadge({required this.person, required this.red});
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       padding:
       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: _red.withOpacity(0.85),
+        color: red.withOpacity(0.85),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
@@ -236,9 +290,30 @@ class _PersonPageState extends State<PersonPage>
       ),
     );
   }
+}
 
-  Widget _buildStats(Person person) {
-    final allIds = {
+class _PersonStats extends StatelessWidget {
+  final Person person;
+  final Set<int> ratedIds;
+  final Color surfaceColor;
+  final Color mutedColor;
+  final Color secondaryColor;
+
+  const _PersonStats({
+    required this.person,
+    required this.ratedIds,
+    required this.surfaceColor,
+    required this.mutedColor,
+    required this.secondaryColor,
+  });
+
+  int get _totalAndSeen {
+    return 0;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final allIds = <int>{
       ...person.actingCredits.map((m) => m.id),
       ...person.directingCredits.map((m) => m.id),
     };
@@ -247,7 +322,7 @@ class _PersonPageState extends State<PersonPage>
       ...person.directingCredits,
     ].where((m) => allIds.remove(m.id)).toList();
 
-    final seen = _countSeenMovies(allCredits);
+    final seen  = allCredits.where((m) => ratedIds.contains(m.id)).length;
     final total = allIds.length + allCredits.length;
 
     return Padding(
@@ -257,44 +332,89 @@ class _PersonPageState extends State<PersonPage>
         runSpacing: 8,
         children: [
           if (person.birthday.isNotEmpty)
-            _statChip(Icons.cake_outlined, person.age),
+            _StatChip(
+              icon:  Icons.cake_outlined,
+              label: person.age,
+              surfaceColor:   surfaceColor,
+              mutedColor:     mutedColor,
+              secondaryColor: secondaryColor,
+            ),
           if (person.placeOfBirth.isNotEmpty)
-            _statChip(
-              Icons.place_outlined,
-              person.placeOfBirth.length > 24
+            _StatChip(
+              icon:  Icons.place_outlined,
+              label: person.placeOfBirth.length > 24
                   ? '${person.placeOfBirth.substring(0, 24)}…'
                   : person.placeOfBirth,
+              surfaceColor:   surfaceColor,
+              mutedColor:     mutedColor,
+              secondaryColor: secondaryColor,
             ),
-          _statChip(Icons.movie_outlined, '$seen vus sur $total films'),
+          _StatChip(
+            icon:  Icons.movie_outlined,
+            label: '$seen vus sur $total films',
+            surfaceColor:   surfaceColor,
+            mutedColor:     mutedColor,
+            secondaryColor: secondaryColor,
+          ),
         ],
       ),
     );
   }
+}
 
-  Widget _statChip(IconData icon, String label) {
+class _StatChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color surfaceColor;
+  final Color mutedColor;
+  final Color secondaryColor;
+
+  const _StatChip({
+    required this.icon,
+    required this.label,
+    required this.surfaceColor,
+    required this.mutedColor,
+    required this.secondaryColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       padding:
       const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: _surfaceColor,
+        color: surfaceColor,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFF2A2A2A)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: _mutedColor, size: 13),
+          Icon(icon, color: mutedColor, size: 13),
           const SizedBox(width: 5),
           Text(label,
-              style: const TextStyle(
-                  color: _secondaryColor, fontSize: 12)),
+              style:
+              TextStyle(color: secondaryColor, fontSize: 12)),
         ],
       ),
     );
   }
+}
 
-  Widget _buildPopularityBadge(Person person) {
-    final pop = person.popularity;
+class _PopularityBadge extends StatelessWidget {
+  final double popularity;
+  final Color red;
+  final Color mutedColor;
+
+  const _PopularityBadge({
+    required this.popularity,
+    required this.red,
+    required this.mutedColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final pop   = popularity;
     final label = pop > 100
         ? 'Très populaire'
         : pop > 50
@@ -307,8 +427,8 @@ class _PersonPageState extends State<PersonPage>
         : pop > 50
         ? const Color(0xFF39EF00)
         : pop > 20
-        ? _red
-        : _mutedColor;
+        ? red
+        : mutedColor;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
@@ -327,8 +447,28 @@ class _PersonPageState extends State<PersonPage>
       ),
     );
   }
+}
 
-  Widget _buildBiography(Person person) {
+class _Biography extends StatefulWidget {
+  final String biography;
+  final Color red;
+  final Color secondaryColor;
+
+  const _Biography({
+    required this.biography,
+    required this.red,
+    required this.secondaryColor,
+  });
+
+  @override
+  State<_Biography> createState() => _BiographyState();
+}
+
+class _BiographyState extends State<_Biography> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
       child: Column(
@@ -345,24 +485,22 @@ class _PersonPageState extends State<PersonPage>
           ),
           const SizedBox(height: 10),
           Text(
-            person.biography,
-            maxLines: _bioExpanded ? null : 4,
-            overflow:
-            _bioExpanded ? null : TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: _secondaryColor,
+            widget.biography,
+            maxLines:  _expanded ? null : 4,
+            overflow:  _expanded ? null : TextOverflow.ellipsis,
+            style: TextStyle(
+              color:  widget.secondaryColor,
               fontSize: 14,
               height: 1.7,
             ),
           ),
           const SizedBox(height: 8),
           GestureDetector(
-            onTap: () =>
-                setState(() => _bioExpanded = !_bioExpanded),
+            onTap: () => setState(() => _expanded = !_expanded),
             child: Text(
-              _bioExpanded ? 'Voir moins' : 'Voir plus',
-              style: const TextStyle(
-                  color: _red,
+              _expanded ? 'Voir moins' : 'Voir plus',
+              style: TextStyle(
+                  color: widget.red,
                   fontSize: 13,
                   fontWeight: FontWeight.w600),
             ),
@@ -371,11 +509,34 @@ class _PersonPageState extends State<PersonPage>
       ),
     );
   }
+}
 
-  Widget _buildTabsSection(Person person) {
-    final actingSeen = _countSeenMovies(person.actingCredits);
-    final directingSeen =
-    _countSeenMovies(person.directingCredits);
+class _FilmographyTabs extends StatelessWidget {
+  final Person person;
+  final TabController tabController;
+  final Set<int> ratedIds;
+  final Color red;
+  final Color mutedColor;
+  final Color cardColor;
+  final int Function(List<PersonMovie>, Set<int>) countSeen;
+
+  const _FilmographyTabs({
+    required this.person,
+    required this.tabController,
+    required this.ratedIds,
+    required this.red,
+    required this.mutedColor,
+    required this.cardColor,
+    required this.countSeen,
+  });
+
+  double _estimateGridHeight(int count) =>
+      (count / 3).ceil() * 220.0 + 20;
+
+  @override
+  Widget build(BuildContext context) {
+    final actingSeen    = countSeen(person.actingCredits, ratedIds);
+    final directingSeen = countSeen(person.directingCredits, ratedIds);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -383,10 +544,10 @@ class _PersonPageState extends State<PersonPage>
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
           child: TabBar(
-            controller: _tabController,
-            indicatorColor: _red,
+            controller: tabController,
+            indicatorColor: red,
             labelColor: Colors.white,
-            unselectedLabelColor: _mutedColor,
+            unselectedLabelColor: mutedColor,
             indicatorSize: TabBarIndicatorSize.label,
             dividerColor: const Color(0xFF2A2A2A),
             tabs: [
@@ -410,25 +571,54 @@ class _PersonPageState extends State<PersonPage>
             ].reduce((a, b) => a > b ? a : b),
           ),
           child: TabBarView(
-            controller: _tabController,
+            controller: tabController,
             children: [
-              _buildMovieGrid(person.actingCredits),
-              _buildMovieGrid(person.directingCredits),
+              _MovieGrid(
+                  credits: person.actingCredits,
+                  ratedIds: ratedIds,
+                  red: red,
+                  mutedColor: mutedColor,
+                  cardColor: cardColor),
+              _MovieGrid(
+                  credits: person.directingCredits,
+                  ratedIds: ratedIds,
+                  red: red,
+                  mutedColor: mutedColor,
+                  cardColor: cardColor),
             ],
           ),
         ),
       ],
     );
   }
+}
 
-  Widget _buildSingleFilmography(Person person) {
+class _SingleFilmography extends StatelessWidget {
+  final Person person;
+  final Set<int> ratedIds;
+  final Color red;
+  final Color mutedColor;
+  final Color cardColor;
+  final int Function(List<PersonMovie>, Set<int>) countSeen;
+
+  const _SingleFilmography({
+    required this.person,
+    required this.ratedIds,
+    required this.red,
+    required this.mutedColor,
+    required this.cardColor,
+    required this.countSeen,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     final credits = person.actingCredits.isNotEmpty
         ? person.actingCredits
         : person.directingCredits;
     final label = person.actingCredits.isNotEmpty
         ? 'Filmographie'
         : 'Films réalisés';
-    final seen = _countSeenMovies(credits);
+    final seen = countSeen(credits, ratedIds);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -447,39 +637,51 @@ class _PersonPageState extends State<PersonPage>
               const SizedBox(width: 8),
               Text(
                 '${credits.length} films · $seen vus',
-                style: const TextStyle(
-                    color: _mutedColor, fontSize: 13),
+                style: TextStyle(color: mutedColor, fontSize: 13),
               ),
             ],
           ),
         ),
-        _buildMovieGrid(credits),
+        _MovieGrid(
+          credits:   credits,
+          ratedIds:  ratedIds,
+          red:       red,
+          mutedColor: mutedColor,
+          cardColor:  cardColor,
+        ),
       ],
     );
   }
+}
 
-  double _estimateGridHeight(int count) {
-    final rows = (count / 3).ceil();
-    return rows * 220.0 + 20;
-  }
+class _MovieGrid extends StatelessWidget {
+  final List<PersonMovie> credits;
+  final Set<int> ratedIds;
+  final Color red;
+  final Color mutedColor;
+  final Color cardColor;
 
-  Widget _buildMovieGrid(List<PersonMovie> credits) {
+  const _MovieGrid({
+    required this.credits,
+    required this.ratedIds,
+    required this.red,
+    required this.mutedColor,
+    required this.cardColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     if (credits.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 40),
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 40),
         child: Center(
           child: Text(
             'Aucun film disponible.',
-            style: TextStyle(color: _mutedColor, fontSize: 14),
+            style: TextStyle(color: mutedColor, fontSize: 14),
           ),
         ),
       );
     }
-
-    final ratedIds = MovieActionService()
-        .getRatedMovies()
-        .map((a) => a.movieId)
-        .toSet();
 
     return GridView.builder(
       shrinkWrap: true,
@@ -493,21 +695,21 @@ class _PersonPageState extends State<PersonPage>
       ),
       itemCount: credits.length,
       itemBuilder: (context, index) {
-        final m = credits[index];
+        final m      = credits[index];
         final isSeen = ratedIds.contains(m.id);
         return GestureDetector(
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => MovieDetailPage(
                 movie: Movie(
-                  id: m.id,
-                  title: m.title,
-                  overview: '',
-                  posterPath: m.posterPath,
+                  id:           m.id,
+                  title:        m.title,
+                  overview:     '',
+                  posterPath:   m.posterPath,
                   backdropPath: '',
-                  voteAverage: m.voteAverage,
-                  releaseDate: m.releaseDate,
-                  genres: [],
+                  voteAverage:  m.voteAverage,
+                  releaseDate:  m.releaseDate,
+                  genres:       [],
                 ),
               ),
             ),
@@ -526,10 +728,10 @@ class _PersonPageState extends State<PersonPage>
                         width: double.infinity,
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) =>
-                            Container(color: _cardColor),
+                            Container(color: cardColor),
                       )
                           : Container(
-                        color: _cardColor,
+                        color: cardColor,
                         child: const Center(
                           child: Icon(Icons.movie,
                               color: Color(0xFF333333),
@@ -544,7 +746,7 @@ class _PersonPageState extends State<PersonPage>
                         child: Container(
                           padding: const EdgeInsets.all(3),
                           decoration: BoxDecoration(
-                            color: _red,
+                            color: red,
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Icon(Icons.check,
@@ -567,8 +769,7 @@ class _PersonPageState extends State<PersonPage>
               if (m.year.isNotEmpty)
                 Text(
                   m.year,
-                  style: const TextStyle(
-                      color: _mutedColor, fontSize: 10),
+                  style: TextStyle(color: mutedColor, fontSize: 10),
                 ),
             ],
           ),

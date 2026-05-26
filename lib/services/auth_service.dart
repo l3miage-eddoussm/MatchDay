@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import '../models/user.dart';
+import 'movie_action_service.dart';
 import 'storage_service.dart';
 
 class AuthService {
@@ -72,6 +73,7 @@ class AuthService {
   }
 
   Future<void> logout() async {
+    MovieActionService().clearUser();
     StorageService().remove(_currentUserKey);
   }
 }

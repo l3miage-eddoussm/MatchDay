@@ -4,6 +4,11 @@ import '../constants.dart';
 import '../models/movie.dart';
 import '../models/movie_detail.dart';
 import '../models/person.dart';
+import 'dart:math';
+import '../constants/cinematch_constants.dart';
+import '../models/cinematch_question.dart';
+import '../models/collection_detail.dart';
+import '../models/movie_credits.dart';
 
 class MovieService {
   static final MovieService _instance = MovieService._internal();
@@ -106,19 +111,24 @@ class MovieService {
         .toList();
   }
 
-  Future<Map<String, dynamic>> getMovieCredits(int movieId) async {
+  Future<MovieCredits> getMovieCredits(int movieId) async {
     final response = await http.get(
       Uri.parse('${AppConstants.tmdbBaseUrl}/movie/$movieId/credits?language=fr-FR'),
       headers: _headers,
     );
-    if (response.statusCode != 200) return {'cast': [], 'crew': []};
+    if (response.statusCode != 200) {
+      return const MovieCredits(cast: [], directors: []);
+    }
     final data = jsonDecode(response.body);
-    final cast = (data['cast'] as List).take(10).map((e) => CastMember.fromJson(e)).toList();
-    final crew = (data['crew'] as List)
+    final cast = (data['cast'] as List)
+        .take(10)
+        .map((e) => CastMember.fromJson(e))
+        .toList();
+    final directors = (data['crew'] as List)
         .map((e) => CrewMember.fromJson(e))
         .where((c) => c.job == 'Director')
         .toList();
-    return {'cast': cast, 'crew': crew};
+    return MovieCredits(cast: cast, directors: directors);
   }
 
   Future<List<Movie>> getSimilarMovies(int movieId) async {
@@ -173,23 +183,106 @@ class MovieService {
     return List<Map<String, dynamic>>.from(data['results'] ?? []);
   }
 
-  Future<Map<String, dynamic>> getCollection(int collectionId) async {
+  Future<CollectionDetail> getCollection(int collectionId) async {
     final response = await http.get(
       Uri.parse('${AppConstants.tmdbBaseUrl}/collection/$collectionId?language=fr-FR'),
       headers: _headers,
     );
-    if (response.statusCode != 200) throw Exception('Impossible de charger la collection.');
+    if (response.statusCode != 200) {
+      throw Exception('Impossible de charger la collection.');
+    }
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     final parts = (data['parts'] as List)
         .map((e) => Movie.fromJson(e))
         .toList()
       ..sort((a, b) => a.releaseDate.compareTo(b.releaseDate));
-    return {
-      'name': data['name'] ?? '',
-      'overview': data['overview'] ?? '',
-      'backdropPath': data['backdrop_path'] ?? '',
-      'posterPath': data['poster_path'] ?? '',
-      'parts': parts,
-    };
+
+    return CollectionDetail(
+      name:         data['name']         ?? '',
+      overview:     data['overview']     ?? '',
+      backdropPath: data['backdrop_path'] ?? '',
+      parts:        parts,
+    );
   }
+  Future<Movie?> getMovieMatch(
+      Map<CineMatchAnswerKey, String> answers, {
+        bool fallback = false,
+      }) async {
+    final mood     = answers[CineMatchAnswerKey.mood]     ?? 'fun';
+    final style    = answers[CineMatchAnswerKey.style]    ?? 'any';
+    final era      = answers[CineMatchAnswerKey.era]      ?? 'any';
+    final duration = answers[CineMatchAnswerKey.duration] ?? 'medium';
+    final audience = answers[CineMatchAnswerKey.audience] ?? 'solo';
+
+    final excluded  = List<int>.from(CineMatchConstants.audienceExcludedGenres[audience] ?? []);
+    final bonus     = CineMatchConstants.audienceBonusGenre[audience] ?? 0;
+    final moodList  = List<int>.from(CineMatchConstants.moodGenres[mood] ?? [CineMatchConstants.fallbackGenreId]);
+    final styleList = fallback ? <int>[] : List<int>.from(CineMatchConstants.styleGenres[style] ?? []);
+
+    final genreSet = <int>{
+      for (final g in [...moodList, ...styleList])
+        if (!excluded.contains(g)) g,
+      if (bonus > 0 && !excluded.contains(bonus)) bonus,
+    };
+
+    final genreParam = genreSet.isNotEmpty
+        ? genreSet.join(',')
+        : CineMatchConstants.fallbackGenreId.toString();
+
+    final baseRating = CineMatchConstants.moodMinRating[mood] ?? 6.5;
+    final minRating  = fallback
+        ? (baseRating - 0.5).clamp(5.0, 9.0)
+        : baseRating.clamp(5.0, 9.0);
+    final minVotes   = fallback
+        ? CineMatchConstants.fallbackMinVoteCount
+        : CineMatchConstants.minVoteCount;
+    final pageRange  = fallback
+        ? CineMatchConstants.fallbackMaxRandomPage
+        : CineMatchConstants.maxRandomPage;
+
+    final params = <String, String>{
+      'language':         'fr-FR',
+      'sort_by':          'popularity.desc',
+      'vote_count.gte':   minVotes.toString(),
+      'vote_average.gte': minRating.toStringAsFixed(1),
+      'with_genres':      genreParam,
+      'page':             (Random().nextInt(pageRange) + 1).toString(),
+      ..._eraParams(era),
+      ..._durationParams(duration),
+      if (audience == 'famille') 'without_genres': '27,53,80,9648',
+    };
+
+    final uri = Uri.parse('${AppConstants.tmdbBaseUrl}/discover/movie')
+        .replace(queryParameters: params);
+
+    final response = await http.get(uri, headers: _headers);
+    if (response.statusCode != 200) return null;
+
+    final results = (jsonDecode(response.body)['results'] as List?) ?? [];
+    if (results.isEmpty) return null;
+
+    final picked = results[Random().nextInt(
+      results.length.clamp(1, CineMatchConstants.maxPickIndex),
+    )];
+    return Movie.fromJson(picked as Map<String, dynamic>);
+  }
+
+  Map<String, String> _eraParams(String era) => switch (era) {
+    'recent'  => {'primary_release_date.gte': '2020-01-01'},
+    'modern'  => {
+      'primary_release_date.gte': '2000-01-01',
+      'primary_release_date.lte': '2019-12-31',
+    },
+    'classic' => {'primary_release_date.lte': '1999-12-31'},
+    _         => {},
+  };
+
+  Map<String, String> _durationParams(String duration) => switch (duration) {
+    'short'  => {'with_runtime.lte': '89'},
+    'medium' => {'with_runtime.gte': '90', 'with_runtime.lte': '120'},
+    'long'   => {'with_runtime.gte': '121'},
+    _        => {},
+  };
+
+
 }
