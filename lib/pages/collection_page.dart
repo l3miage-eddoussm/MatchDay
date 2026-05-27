@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import '../constants.dart';
 import '../models/collection_detail.dart';
 import '../models/movie.dart';
 import '../services/movie_service.dart';
+import '../widgets/collection_header.dart';
 import '../widgets/collection_movie_card.dart';
 import '../widgets/collection_timeline_dot.dart';
 
@@ -26,14 +28,19 @@ class _CollectionPageState extends State<CollectionPage> {
 
   Future<void> _load() async {
     final collection = widget.currentMovie.belongsToCollection;
-    if (collection == null) return;
+    if (collection == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
     try {
       final data = await MovieService().getCollection(collection.id);
+      if (!mounted) return;
       setState(() {
         _collection = data;
         _isLoading  = false;
       });
     } catch (_) {
+      if (!mounted) return;
       setState(() => _isLoading = false);
     }
   }
@@ -41,15 +48,14 @@ class _CollectionPageState extends State<CollectionPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0A0A),
+      backgroundColor: AppColors.background,
       body: _isLoading
           ? const Center(
-        child: CircularProgressIndicator(
-            color: Colors.white, strokeWidth: 2),
+        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
       )
           : CustomScrollView(
         slivers: [
-          _buildHeader(),
+          if (_collection != null) CollectionHeader(collection: _collection!),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(24, 32, 24, 48),
             sliver: SliverList(
@@ -64,104 +70,11 @@ class _CollectionPageState extends State<CollectionPage> {
     );
   }
 
-  Widget _buildHeader() {
-    final collection = _collection;
-    return SliverAppBar(
-      expandedHeight: 320,
-      pinned: true,
-      backgroundColor: const Color(0xFF0A0A0A),
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-        onPressed: () => Navigator.of(context).pop(),
-      ),
-      flexibleSpace: FlexibleSpaceBar(
-        background: Stack(
-          fit: StackFit.expand,
-          children: [
-            collection != null && collection.backdropPath.isNotEmpty
-                ? Image.network(
-              collection.backdropUrl,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) =>
-                  Container(color: const Color(0xFF1A1A1A)),
-            )
-                : Container(color: const Color(0xFF1A1A1A)),
-            Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Color(0x33000000), Color(0xFF0A0A0A)],
-                  stops: [0.3, 1.0],
-                ),
-              ),
-            ),
-            if (collection != null)
-              Positioned(
-                bottom: 24,
-                left: 24,
-                right: 24,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                            color: Colors.white.withOpacity(0.2)),
-                      ),
-                      child: Text(
-                        '${collection.parts.length} FILMS',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.5,
-                          decoration: TextDecoration.none,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      collection.name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.w900,
-                        height: 1.1,
-                        decoration: TextDecoration.none,
-                      ),
-                    ),
-                    if (collection.overview.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        collection.overview,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white54,
-                          fontSize: 13,
-                          height: 1.5,
-                          decoration: TextDecoration.none,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildTimelineItem(int index) {
-    final parts   = _collection!.parts;
-    final movie   = parts[index];
-    final isLast  = index == parts.length - 1;
+    final parts     = _collection?.parts ?? [];
+    if (parts.isEmpty) return const SizedBox.shrink();
+    final movie     = parts[index];
+    final isLast    = index == parts.length - 1;
     final isCurrent = movie.id == widget.currentMovie.id;
 
     return IntrinsicHeight(

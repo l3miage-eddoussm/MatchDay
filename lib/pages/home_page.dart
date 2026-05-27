@@ -8,23 +8,36 @@ import '../models/user_movie_action.dart';
 import '../services/auth_service.dart';
 import '../services/movie_action_service.dart';
 import '../services/movie_service.dart';
+import '../utils/app_router.dart';
+import '../widgets/movie_poster_placeholder.dart';
 import 'cinematch_page.dart';
 import 'login_page.dart';
 import 'movie_detail_page.dart';
 import 'profile_page.dart';
 import 'search_page.dart';
 
-
+@immutable
 class _SectionState {
-  List<Movie> movies;
-  int currentPage;
-  bool isLoadingMore;
+  final List<Movie> movies;
+  final int currentPage;
+  final bool isLoadingMore;
 
-  _SectionState({
+  const _SectionState({
     this.movies = const [],
     this.currentPage = 1,
     this.isLoadingMore = false,
   });
+
+  _SectionState copyWith({
+    List<Movie>? movies,
+    int? currentPage,
+    bool? isLoadingMore,
+  }) =>
+      _SectionState(
+        movies: movies ?? this.movies,
+        currentPage: currentPage ?? this.currentPage,
+        isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      );
 }
 
 class HomePage extends StatefulWidget {
@@ -36,10 +49,10 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  late _SectionState _trending;
-  late _SectionState _nowPlaying;
-  late _SectionState _topRated;
-  late _SectionState _upcoming;
+  _SectionState _trending   = const _SectionState();
+  _SectionState _nowPlaying = const _SectionState();
+  _SectionState _topRated   = const _SectionState();
+  _SectionState _upcoming   = const _SectionState();
   final Map<int, _SectionState> _byGenre = {};
 
   List<UserMovieAction> _watchLater = [];
@@ -53,10 +66,6 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    _trending   = _SectionState();
-    _nowPlaying = _SectionState();
-    _topRated   = _SectionState();
-    _upcoming   = _SectionState();
     _loadAll();
   }
 
@@ -80,6 +89,7 @@ class _HomePageState extends State<HomePage> {
         ...genreFutures,
       ]);
 
+      if (!mounted) return;
       setState(() {
         _trending   = _SectionState(movies: results[0]);
         _nowPlaying = _SectionState(movies: results[1]);
@@ -94,6 +104,7 @@ class _HomePageState extends State<HomePage> {
       });
       _startHeroTimer();
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error     = e.toString().replaceAll('Exception: ', '');
         _isLoading = false;
@@ -104,18 +115,21 @@ class _HomePageState extends State<HomePage> {
   Future<void> _loadMore(
       _SectionState section,
       Future<List<Movie>> Function(int) fetcher,
+      void Function(_SectionState) onUpdate,
       ) async {
     if (section.isLoadingMore) return;
-    setState(() => section.isLoadingMore = true);
+    setState(() => onUpdate(section.copyWith(isLoadingMore: true)));
     try {
       final next = await fetcher(section.currentPage + 1);
-      setState(() {
-        section.movies      = [...section.movies, ...next];
-        section.currentPage++;
-        section.isLoadingMore = false;
-      });
+      if (!mounted) return;
+      setState(() => onUpdate(section.copyWith(
+        movies: [...section.movies, ...next],
+        currentPage: section.currentPage + 1,
+        isLoadingMore: false,
+      )));
     } catch (_) {
-      setState(() => section.isLoadingMore = false);
+      if (!mounted) return;
+      setState(() => onUpdate(section.copyWith(isLoadingMore: false)));
     }
   }
 
@@ -145,14 +159,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _openMovie(Movie movie) async {
-    await Navigator.of(context).push(
-      PageRouteBuilder(
-        pageBuilder: (_, __, ___) => MovieDetailPage(movie: movie),
-        transitionsBuilder: (_, anim, __, child) =>
-            FadeTransition(opacity: anim, child: child),
-        transitionDuration: const Duration(milliseconds: 350),
-      ),
-    );
+    await Navigator.of(context).push(fadeRoute(MovieDetailPage(movie: movie)));
     if (mounted) _refreshWatchLater();
   }
 
@@ -194,13 +201,10 @@ class _HomePageState extends State<HomePage> {
       body: CustomScrollView(
         slivers: [
           _HomeAppBar(
-            user:       widget.user,
-            onSearch:   () => Navigator.of(context).push(PageRouteBuilder(
-              pageBuilder: (_, __, ___) => const SearchPage(),
-              transitionsBuilder: (_, anim, __, child) =>
-                  FadeTransition(opacity: anim, child: child),
-              transitionDuration: const Duration(milliseconds: 300),
-            )),
+            user:        widget.user,
+            onSearch:    () => Navigator.of(context).push(
+              fadeRoute(const SearchPage(), duration: const Duration(milliseconds: 300)),
+            ),
             onCineMatch: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const CineMatchPage()),
             ),
@@ -214,29 +218,20 @@ class _HomePageState extends State<HomePage> {
           ),
           SliverToBoxAdapter(
             child: _HeroBanner(
-              movies:     _trending.movies.take(5).toList(),
-              heroIndex:  _heroIndex,
-              heroCtrl:   _heroCtrl,
-              watchLater: _watchLater,
+              movies:        _trending.movies.take(5).toList(),
+              heroIndex:     _heroIndex,
+              heroCtrl:      _heroCtrl,
+              watchLater:    _watchLater,
               onPageChanged: (i) => setState(() => _heroIndex = i),
-              onPlay:     _openMovie,
-              onToggle:   _toggleWatchLaterHero,
+              onPlay:        _openMovie,
+              onToggle:      _toggleWatchLaterHero,
             ),
           ),
           if (_watchLater.isNotEmpty)
             SliverToBoxAdapter(
               child: _WatchLaterSection(
-                watchLater:  _watchLater,
-                onTap:       (action) => _openMovie(Movie(
-                  id:           action.movieId,
-                  title:        action.movieTitle,
-                  posterPath:   action.posterPath,
-                  backdropPath: '',
-                  overview:     '',
-                  releaseDate:  '',
-                  voteAverage:  0,
-                  genres:       [],
-                )),
+                watchLater: _watchLater,
+                onTap:      (action) => _openMovie(action.toMovie()),
                 onRemove: (action) {
                   MovieActionService().toggleWatchLater(
                       action.movieId, action.movieTitle, action.posterPath);
@@ -250,7 +245,7 @@ class _HomePageState extends State<HomePage> {
               section: _trending,
               fetcher: (p) => MovieService().getTrendingMovies(page: p),
               onTap:   _openMovie,
-              onMore:  _loadMore,
+              onMore:  (s, f) => _loadMore(s, f, (u) => _trending = u),
             ),
           ),
           SliverToBoxAdapter(
@@ -259,7 +254,7 @@ class _HomePageState extends State<HomePage> {
               section: _nowPlaying,
               fetcher: (p) => MovieService().getNowPlayingMovies(page: p),
               onTap:   _openMovie,
-              onMore:  _loadMore,
+              onMore:  (s, f) => _loadMore(s, f, (u) => _nowPlaying = u),
             ),
           ),
           SliverToBoxAdapter(
@@ -268,7 +263,7 @@ class _HomePageState extends State<HomePage> {
               section: _topRated,
               fetcher: (p) => MovieService().getTopRatedMovies(page: p),
               onTap:   _openMovie,
-              onMore:  _loadMore,
+              onMore:  (s, f) => _loadMore(s, f, (u) => _topRated = u),
             ),
           ),
           SliverToBoxAdapter(
@@ -277,18 +272,19 @@ class _HomePageState extends State<HomePage> {
               section: _upcoming,
               fetcher: (p) => MovieService().getUpcomingMovies(page: p),
               onTap:   _openMovie,
-              onMore:  _loadMore,
+              onMore:  (s, f) => _loadMore(s, f, (u) => _upcoming = u),
             ),
           ),
           for (final genre in GenreConstants.genres)
             SliverToBoxAdapter(
               child: _MovieSection(
                 title:   genre.name,
-                section: _byGenre[genre.id] ?? _SectionState(),
-                fetcher: (p) =>
-                    MovieService().getMoviesByGenre(genre.id, page: p),
-                onTap:  _openMovie,
-                onMore: _loadMore,
+                section: _byGenre[genre.id] ?? const _SectionState(),
+                fetcher: (p) => MovieService().getMoviesByGenre(genre.id, page: p),
+                onTap:   _openMovie,
+                onMore:  (s, f) => _loadMore(
+                  s, f, (u) => _byGenre[genre.id] = u,
+                ),
               ),
             ),
           const SliverToBoxAdapter(child: SizedBox(height: 48)),
@@ -334,7 +330,7 @@ class _HomeAppBar extends StatelessWidget {
           child: Container(
             height: 34,
             decoration: BoxDecoration(
-              color: const Color(0xFF1A1A1A),
+              color: AppColors.surfaceDark,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: Colors.white12),
             ),
@@ -345,8 +341,7 @@ class _HomeAppBar extends StatelessWidget {
                   onTap: onSearch,
                   child: const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 8),
-                    child: Icon(Icons.search_rounded,
-                        color: Colors.white, size: 15),
+                    child: Icon(Icons.search_rounded, color: Colors.white, size: 15),
                   ),
                 ),
                 Container(width: 1, height: 14, color: Colors.white12),
@@ -356,8 +351,7 @@ class _HomeAppBar extends StatelessWidget {
                     padding: EdgeInsets.symmetric(horizontal: 8),
                     child: Row(
                       children: [
-                        Icon(Icons.auto_awesome_rounded,
-                            color: Colors.white, size: 13),
+                        Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 13),
                         SizedBox(width: 4),
                         Text(
                           'CineMatch',
@@ -394,8 +388,7 @@ class _HomeAppBar extends StatelessWidget {
           ),
         ),
         IconButton(
-          icon: const Icon(Icons.logout,
-              color: Color(0xFF888888), size: 18),
+          icon: const Icon(Icons.logout, color: Color(0xFF888888), size: 18),
           onPressed: onLogout,
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 36),
@@ -403,7 +396,7 @@ class _HomeAppBar extends StatelessWidget {
       ],
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
-        child: Container(height: 1, color: const Color(0xFF1A1A1A)),
+        child: Container(height: 1, color: AppColors.surfaceDark),
       ),
     );
   }
@@ -441,10 +434,7 @@ class _HeroBanner extends StatelessWidget {
             itemCount: movies.length,
             itemBuilder: (_, index) {
               final movie  = movies[index];
-              final inList = MovieActionService()
-                  .getAction(movie.id)
-                  ?.watchLater ??
-                  false;
+              final inList = MovieActionService().getAction(movie.id)?.watchLater ?? false;
               return _HeroSlide(
                 movie:  movie,
                 inList: inList,
@@ -467,9 +457,7 @@ class _HeroBanner extends StatelessWidget {
                   width:  active ? 20 : 6,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: active
-                        ? Colors.white
-                        : const Color(0xFF555555),
+                    color: active ? Colors.white : const Color(0xFF555555),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 );
@@ -513,8 +501,7 @@ class _WatchLaterSection extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
                   color: const Color(0xFF2A2A2A),
                   borderRadius: BorderRadius.circular(20),
@@ -611,8 +598,7 @@ class _LoadMoreButton extends StatelessWidget {
   final bool isLoadingMore;
   final VoidCallback onTap;
 
-  const _LoadMoreButton(
-      {required this.isLoadingMore, required this.onTap});
+  const _LoadMoreButton({required this.isLoadingMore, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -680,10 +666,9 @@ class _HeroSlide extends StatelessWidget {
               ? Image.network(
             movie.posterUrl,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) =>
-                Container(color: const Color(0xFF1A1A1A)),
+            errorBuilder: (_, __, ___) => const MoviePosterPlaceholder(),
           )
-              : Container(color: const Color(0xFF1A1A1A)),
+              : const MoviePosterPlaceholder(),
           const DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -712,9 +697,7 @@ class _HeroSlide extends StatelessWidget {
                     fontSize: 28,
                     fontWeight: FontWeight.w900,
                     height: 1.1,
-                    shadows: [
-                      Shadow(color: Colors.black54, blurRadius: 8)
-                    ],
+                    shadows: [Shadow(color: Colors.black54, blurRadius: 8)],
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -767,17 +750,13 @@ class _HeroBtn extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
         decoration: BoxDecoration(
           color: filled ? Colors.white : Colors.transparent,
-          border: filled
-              ? null
-              : Border.all(color: Colors.white70, width: 1),
+          border: filled ? null : Border.all(color: Colors.white70, width: 1),
           borderRadius: BorderRadius.circular(6),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon,
-                size: 17,
-                color: filled ? Colors.black : Colors.white),
+            Icon(icon, size: 17, color: filled ? Colors.black : Colors.white),
             const SizedBox(width: 5),
             Text(
               label,
@@ -805,14 +784,6 @@ class _WatchLaterCard extends StatelessWidget {
     required this.onRemove,
   });
 
-  Widget _placeholder() => Container(
-    color: const Color(0xFF1A1A1A),
-    child: const Center(
-      child:
-      Icon(Icons.movie, color: Color(0xFF333333), size: 28),
-    ),
-  );
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -831,13 +802,13 @@ class _WatchLaterCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(8),
                       child: action.posterPath.isNotEmpty
                           ? Image.network(
-                        '${AppConstants.tmdbImageBaseUrl}/w300${action.posterPath}',
+                        action.posterUrl,
                         fit: BoxFit.cover,
                         width: 110,
                         errorBuilder: (_, __, ___) =>
-                            _placeholder(),
+                        const MoviePosterPlaceholder(),
                       )
-                          : _placeholder(),
+                          : const MoviePosterPlaceholder(),
                     ),
                     Positioned(
                       top: 4,
@@ -872,8 +843,7 @@ class _WatchLaterCard extends StatelessWidget {
               const SizedBox(height: 2),
               const Text(
                 'À revoir',
-                style:
-                TextStyle(color: Color(0xFF666666), fontSize: 10),
+                style: TextStyle(color: Color(0xFF666666), fontSize: 10),
               ),
             ],
           ),
@@ -888,14 +858,6 @@ class _PosterCard extends StatelessWidget {
   final VoidCallback onTap;
 
   const _PosterCard({required this.movie, required this.onTap});
-
-  Widget _placeholder() => Container(
-    color: const Color(0xFF1A1A1A),
-    child: const Center(
-      child:
-      Icon(Icons.movie, color: Color(0xFF333333), size: 28),
-    ),
-  );
 
   @override
   Widget build(BuildContext context) {
@@ -917,9 +879,9 @@ class _PosterCard extends StatelessWidget {
                     fit: BoxFit.cover,
                     width: 110,
                     errorBuilder: (_, __, ___) =>
-                        _placeholder(),
+                    const MoviePosterPlaceholder(),
                   )
-                      : _placeholder(),
+                      : const MoviePosterPlaceholder(),
                 ),
               ),
               const SizedBox(height: 6),

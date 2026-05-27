@@ -1,3 +1,7 @@
+import 'package:flutter/foundation.dart';
+import '../constants.dart';
+import '../models/movie.dart';
+
 class UserMovieAction {
   final int movieId;
   final String movieTitle;
@@ -112,6 +116,19 @@ class UserMovieAction {
         directors: directors ?? this.directors,
         topActors: topActors ?? this.topActors,
       );
+
+  String get posterUrl => '${AppConstants.tmdbImageBaseUrl}/w300$posterPath';
+
+  Movie toMovie() => Movie(
+    id: movieId,
+    title: movieTitle,
+    posterPath: posterPath,
+    backdropPath: '',
+    overview: '',
+    releaseDate: '',
+    voteAverage: 0,
+    genres: [],
+  );
 
   bool get hasReview => review != null && review!.trim().isNotEmpty;
 

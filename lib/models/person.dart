@@ -1,5 +1,7 @@
+import 'movie.dart';
+
 class PersonMovie {
-  final int id;
+  final int    id;
   final String title;
   final String posterPath;
   final String releaseDate;
@@ -20,23 +22,35 @@ class PersonMovie {
   });
 
   factory PersonMovie.fromJson(Map<String, dynamic> json) => PersonMovie(
-    id: json['id'] ?? 0,
-    title: json['title'] ?? json['name'] ?? '',
-    posterPath: json['poster_path'] ?? '',
+    id:          json['id'] ?? 0,
+    title:       json['title'] ?? json['name'] ?? '',
+    posterPath:  json['poster_path'] ?? '',
     releaseDate: json['release_date'] ?? json['first_air_date'] ?? '',
     voteAverage: (json['vote_average'] as num?)?.toDouble() ?? 0.0,
-    character: json['character'] ?? '',
-    job: json['job'] ?? '',
-    department: json['department'] ?? '',
+    character:   json['character'] ?? '',
+    job:         json['job'] ?? '',
+    department:  json['department'] ?? '',
   );
 
   String get posterUrl => 'https://image.tmdb.org/t/p/w185$posterPath';
+
   String get year =>
       releaseDate.length >= 4 ? releaseDate.substring(0, 4) : '';
+
+  Movie toMovie() => Movie(
+    id:           id,
+    title:        title,
+    posterPath:   posterPath,
+    backdropPath: '',
+    overview:     '',
+    voteAverage:  voteAverage,
+    releaseDate:  releaseDate,
+    genres:       [],
+  );
 }
 
 class Person {
-  final int id;
+  final int    id;
   final String name;
   final String biography;
   final String profilePath;
@@ -66,19 +80,24 @@ class Person {
       List<PersonMovie> directing,
       ) =>
       Person(
-        id: details['id'] ?? 0,
-        name: details['name'] ?? '',
-        biography: details['biography'] ?? '',
-        profilePath: details['profile_path'] ?? '',
-        birthday: details['birthday'] ?? '',
-        placeOfBirth: details['place_of_birth'] ?? '',
+        id:                 details['id'] ?? 0,
+        name:               details['name'] ?? '',
+        biography:          details['biography'] ?? '',
+        profilePath:        details['profile_path'] ?? '',
+        birthday:           details['birthday'] ?? '',
+        placeOfBirth:       details['place_of_birth'] ?? '',
         knownForDepartment: details['known_for_department'] ?? '',
-        popularity: (details['popularity'] as num?)?.toDouble() ?? 0.0,
-        actingCredits: acting,
-        directingCredits: directing,
+        popularity:         (details['popularity'] as num?)?.toDouble() ?? 0.0,
+        actingCredits:      acting,
+        directingCredits:   directing,
       );
 
   String get profileUrl => 'https://image.tmdb.org/t/p/w342$profilePath';
+
+  String get shortPlaceOfBirth =>
+      placeOfBirth.length > 24
+          ? '${placeOfBirth.substring(0, 24)}…'
+          : placeOfBirth;
 
   String get age {
     if (birthday.isEmpty || birthday.length < 4) return '';
@@ -91,6 +110,6 @@ class Person {
     return '$a ans';
   }
 
-  bool get isActor => knownForDepartment == 'Acting';
+  bool get isActor    => knownForDepartment == 'Acting';
   bool get isDirector => knownForDepartment == 'Directing';
 }

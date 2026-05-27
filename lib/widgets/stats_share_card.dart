@@ -1,22 +1,19 @@
 import 'package:flutter/material.dart';
-import '../services/movie_action_service.dart';
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
 import 'package:screenshot/screenshot.dart';
-import 'package:share_plus/share_plus.dart';
+import '../constants.dart';
+import '../services/movie_action_service.dart';
+import '../services/share_service.dart';
 
 const double _kCardWidth = 500.0;
-const double _kPad = 16.0;
-const int _kCols = 5;
-const double _kGap = 5.0;
+const double _kPad       = 16.0;
+const int    _kCols      = 5;
+const double _kGap       = 5.0;
 
-double _posterW() =>
-    (_kCardWidth - _kPad * 2 - _kGap * (_kCols - 1)) / _kCols;
-
+double _posterW() => (_kCardWidth - _kPad * 2 - _kGap * (_kCols - 1)) / _kCols;
 double _posterH() => _posterW() * 1.45;
 
 class StatsShareCard extends StatefulWidget {
-  final int year;
+  final int    year;
   final String username;
   final String initials;
 
@@ -36,21 +33,13 @@ class _StatsShareCardState extends State<StatsShareCard> {
 
   Future<void> _share() async {
     try {
-      final imageBytes = await _screenshotController.capture(pixelRatio: 3.0);
-      if (imageBytes == null) return;
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/stats_${widget.year}.png');
-      await file.writeAsBytes(imageBytes);
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        text: 'Mes stats ciné ${widget.year} sur CINEART',
-      );
+      await ShareService().shareStats(_screenshotController, widget.year);
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Impossible de générer la carte.'),
-          backgroundColor: Color(0xFF1A1A1A),
+          backgroundColor: AppColors.surfaceDark,
         ),
       );
     }
@@ -70,9 +59,9 @@ class _StatsShareCardState extends State<StatsShareCard> {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: const Color(0xFF1E1E1E)),
             ),
-            child: Row(
+            child: const Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
+              children: [
                 Icon(Icons.ios_share_rounded, color: Colors.white54, size: 15),
                 SizedBox(width: 8),
                 Text(
@@ -95,7 +84,7 @@ class _StatsShareCardState extends State<StatsShareCard> {
             child: Screenshot(
               controller: _screenshotController,
               child: _StatsCard(
-                year: widget.year,
+                year:     widget.year,
                 username: widget.username,
                 initials: widget.initials,
               ),
@@ -108,7 +97,7 @@ class _StatsShareCardState extends State<StatsShareCard> {
 }
 
 class _StatsCard extends StatelessWidget {
-  final int year;
+  final int    year;
   final String username;
   final String initials;
 
@@ -121,13 +110,13 @@ class _StatsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final allMovies = MovieActionService().getRatedMoviesForYear(year);
-    final sorted = [...allMovies]
+    final sorted    = [...allMovies]
       ..sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
-    final avg = MovieActionService().getAverageRatingForYear(year);
-    final trophies = MovieActionService().getTrophiesForYear(year).length;
-    final actor = MovieActionService().getMostWatchedActorForYear(year);
-    final director = MovieActionService().getMostWatchedDirectorForYear(year);
-    final genre = MovieActionService().getMostWatchedGenreForYear(year);
+    final avg       = MovieActionService().getAverageRatingForYear(year);
+    final trophies  = MovieActionService().getTrophiesForYear(year).length;
+    final actor     = MovieActionService().getMostWatchedActorForYear(year);
+    final director  = MovieActionService().getMostWatchedDirectorForYear(year);
+    final genre     = MovieActionService().getMostWatchedGenreForYear(year);
 
     return Container(
       width: _kCardWidth,
@@ -156,7 +145,7 @@ class _StatsCard extends StatelessWidget {
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: const Color(0xFF1A1A1A),
+              color: AppColors.surfaceDark,
               shape: BoxShape.circle,
               border: Border.all(color: const Color(0xFF2A2A2A), width: 1.5),
             ),
@@ -257,27 +246,23 @@ class _StatsCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 24,
-            fontWeight: FontWeight.w900,
-            letterSpacing: -0.5,
-            height: 1,
-            decoration: TextDecoration.none,
-          ),
-        ),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white54,
-            fontSize: 8,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.3,
-            decoration: TextDecoration.none,
-          ),
-        ),
+        Text(value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.5,
+              height: 1,
+              decoration: TextDecoration.none,
+            )),
+        Text(label,
+            style: const TextStyle(
+              color: Colors.white54,
+              fontSize: 8,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.3,
+              decoration: TextDecoration.none,
+            )),
       ],
     );
   }
@@ -286,27 +271,23 @@ class _StatsCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(
-          value,
-          style: TextStyle(
-            color: color,
-            fontSize: 24,
-            fontWeight: FontWeight.w900,
-            letterSpacing: -0.5,
-            height: 1,
-            decoration: TextDecoration.none,
-          ),
-        ),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white54,
-            fontSize: 8,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.3,
-            decoration: TextDecoration.none,
-          ),
-        ),
+        Text(value,
+            style: TextStyle(
+              color: color,
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.5,
+              height: 1,
+              decoration: TextDecoration.none,
+            )),
+        Text(label,
+            style: const TextStyle(
+              color: Colors.white54,
+              fontSize: 8,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.3,
+              decoration: TextDecoration.none,
+            )),
       ],
     );
   }
@@ -335,29 +316,25 @@ class _StatsCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  item.$1,
-                  style: const TextStyle(
-                    color: Colors.white54,
-                    fontSize: 8,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.5,
-                    decoration: TextDecoration.none,
-                  ),
-                ),
+                Text(item.$1,
+                    style: const TextStyle(
+                      color: Colors.white54,
+                      fontSize: 8,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.5,
+                      decoration: TextDecoration.none,
+                    )),
                 const SizedBox(height: 3),
-                Text(
-                  item.$2,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.2,
-                    decoration: TextDecoration.none,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                Text(item.$2,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.2,
+                      decoration: TextDecoration.none,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
               ],
             ),
           );
@@ -375,29 +352,26 @@ class _StatsCard extends StatelessWidget {
   }
 
   Widget _buildPosterGrid(List movies) {
-    final pw = _posterW();
-    final ph = _posterH();
+    final pw   = _posterW();
+    final ph   = _posterH();
     final rows = <List>[];
     for (int i = 0; i < movies.length; i += _kCols) {
       rows.add(movies.sublist(i, (i + _kCols).clamp(0, movies.length)));
     }
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: _kPad),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
-            'CLASSEMENT',
-            style: TextStyle(
-              color: Colors.white54,
-              fontSize: 8,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 2,
-              decoration: TextDecoration.none,
-            ),
-          ),
+          const Text('CLASSEMENT',
+              style: TextStyle(
+                color: Colors.white54,
+                fontSize: 8,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 2,
+                decoration: TextDecoration.none,
+              )),
           const SizedBox(height: 8),
           ...List.generate(rows.length, (ri) {
             final row = rows[ri];
@@ -407,11 +381,11 @@ class _StatsCard extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   ...List.generate(row.length, (ci) {
-                    final action = row[ci];
-                    final rank = ri * _kCols + ci + 1;
-                    final rating = action.rating?.toInt();
+                    final action     = row[ci];
+                    final rank       = ri * _kCols + ci + 1;
+                    final rating     = action.rating?.toInt();
                     final posterPath = action.posterPath ?? '';
-                    final title = action.movieTitle ?? '';
+                    final title      = action.movieTitle ?? '';
                     return Container(
                       margin: EdgeInsets.only(
                           right: ci < row.length - 1 ? _kGap : 0),
@@ -453,18 +427,16 @@ class _StatsCard extends StatelessWidget {
                               ),
                               padding:
                               const EdgeInsets.fromLTRB(5, 20, 18, 5),
-                              child: Text(
-                                title,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 7.5,
-                                  fontWeight: FontWeight.w700,
-                                  decoration: TextDecoration.none,
-                                  height: 1.2,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                              child: Text(title,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 7.5,
+                                    fontWeight: FontWeight.w700,
+                                    decoration: TextDecoration.none,
+                                    height: 1.2,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis),
                             ),
                           ),
                           Positioned(
@@ -478,15 +450,13 @@ class _StatsCard extends StatelessWidget {
                                 shape: BoxShape.circle,
                               ),
                               alignment: Alignment.center,
-                              child: Text(
-                                '$rank',
-                                style: const TextStyle(
-                                  color: Colors.white54,
-                                  fontSize: 7,
-                                  fontWeight: FontWeight.w800,
-                                  decoration: TextDecoration.none,
-                                ),
-                              ),
+                              child: Text('$rank',
+                                  style: const TextStyle(
+                                    color: Colors.white54,
+                                    fontSize: 7,
+                                    fontWeight: FontWeight.w800,
+                                    decoration: TextDecoration.none,
+                                  )),
                             ),
                           ),
                           if (rating != null)
@@ -505,15 +475,13 @@ class _StatsCard extends StatelessWidget {
                                     width: 0.8,
                                   ),
                                 ),
-                                child: Text(
-                                  '$rating',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w900,
-                                    decoration: TextDecoration.none,
-                                  ),
-                                ),
+                                child: Text('$rating',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w900,
+                                      decoration: TextDecoration.none,
+                                    )),
                               ),
                             ),
                         ],
@@ -525,8 +493,8 @@ class _StatsCard extends StatelessWidget {
                       _kCols - row.length,
                           (fi) => Container(
                         margin: EdgeInsets.only(
-                          right: fi < (_kCols - row.length - 1) ? _kGap : 0,
-                        ),
+                            right:
+                            fi < (_kCols - row.length - 1) ? _kGap : 0),
                         width: pw,
                         height: ph,
                       ),
@@ -551,18 +519,16 @@ class _StatsCard extends StatelessWidget {
           ? Center(
         child: Padding(
           padding: const EdgeInsets.all(5),
-          child: Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white38,
-              fontSize: 7,
-              fontWeight: FontWeight.w600,
-              decoration: TextDecoration.none,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-          ),
+          child: Text(title,
+              style: const TextStyle(
+                color: Colors.white38,
+                fontSize: 7,
+                fontWeight: FontWeight.w600,
+                decoration: TextDecoration.none,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis),
         ),
       )
           : const SizedBox.shrink(),
@@ -570,21 +536,19 @@ class _StatsCard extends StatelessWidget {
   }
 
   Widget _buildFooter() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(_kPad, 10, _kPad, 16),
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(_kPad, 10, _kPad, 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: const [
-          Text(
-            'CINEART',
-            style: TextStyle(
-              color: Colors.white24,
-              fontSize: 8,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 3,
-              decoration: TextDecoration.none,
-            ),
-          ),
+        children: [
+          Text('CINEART',
+              style: TextStyle(
+                color: Colors.white24,
+                fontSize: 8,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 3,
+                decoration: TextDecoration.none,
+              )),
         ],
       ),
     );

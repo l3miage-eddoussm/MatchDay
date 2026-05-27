@@ -6,6 +6,9 @@ abstract final class CineMatchConstants {
   static const int fallbackMinVoteCount  = 100;
   static const int fallbackGenreId       = 18;
 
+  static const String noMovieFound = "Aucun film trouvé.\nEssaie d'autres réponses !";
+  static const String networkError  = "Une erreur est survenue.\nVérifie ta connexion et réessaie.";
+
   static const Map<String, List<int>> moodGenres = {
     'fun':    [35],
     'scared': [27, 53],

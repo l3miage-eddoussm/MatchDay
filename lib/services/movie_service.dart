@@ -1,14 +1,16 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:http/http.dart' as http;
 import '../constants.dart';
-import '../models/movie.dart';
-import '../models/movie_detail.dart';
-import '../models/person.dart';
-import 'dart:math';
 import '../constants/cinematch_constants.dart';
 import '../models/cinematch_question.dart';
 import '../models/collection_detail.dart';
+import '../models/genre.dart';
+import '../models/movie.dart';
 import '../models/movie_credits.dart';
+import '../models/movie_detail.dart';
+import '../models/person.dart';
+import '../models/search_result.dart';
 
 class MovieService {
   static final MovieService _instance = MovieService._internal();
@@ -20,35 +22,24 @@ class MovieService {
     'Content-Type': 'application/json',
   };
 
-
-  Future<List<Movie>> _fetchPaginated(String baseUrl,
-      {int page = 1, int perPage = 10}) async {
+  Future<List<Movie>> _fetchPaginated(String baseUrl, {int page = 1, int perPage = 10}) async {
     final uri = Uri.parse('$baseUrl${baseUrl.contains('?') ? '&' : '?'}page=$page');
     final response = await http.get(uri, headers: _headers);
     if (response.statusCode != 200) return [];
     final data = jsonDecode(response.body);
     final results = (data['results'] as List).map((e) => Movie.fromJson(e)).toList();
-    final start = 0;
     final end = perPage < results.length ? perPage : results.length;
-    return results.sublist(start, end);
+    return results.sublist(0, end);
   }
-
 
   Future<String?> searchPersonImage(String name) async {
     try {
       final uri = Uri.parse(
         '${AppConstants.tmdbBaseUrl}/search/person?query=${Uri.encodeComponent(name)}',
       );
-      final response = await http.get(
-        uri,
-        headers: {
-          'Authorization': 'Bearer ${AppConstants.tmdbToken}',
-          'accept': 'application/json',
-        },
-      );
+      final response = await http.get(uri, headers: _headers);
       if (response.statusCode != 200) return null;
-      final data = jsonDecode(response.body);
-      final results = data['results'] as List;
+      final results = jsonDecode(response.body)['results'] as List;
       if (results.isEmpty) return null;
       final path = results.first['profile_path'];
       if (path == null) return null;
@@ -116,9 +107,7 @@ class MovieService {
       Uri.parse('${AppConstants.tmdbBaseUrl}/movie/$movieId/credits?language=fr-FR'),
       headers: _headers,
     );
-    if (response.statusCode != 200) {
-      return const MovieCredits(cast: [], directors: []);
-    }
+    if (response.statusCode != 200) return const MovieCredits(cast: [], directors: []);
     final data = jsonDecode(response.body);
     final cast = (data['cast'] as List)
         .take(10)
@@ -143,12 +132,8 @@ class MovieService {
 
   Future<Person> getPersonDetails(int personId) async {
     final results = await Future.wait([
-      http.get(Uri.parse('${AppConstants.tmdbBaseUrl}/person/$personId?language=fr-FR'),
-          headers: _headers),
-      http.get(
-          Uri.parse(
-              '${AppConstants.tmdbBaseUrl}/person/$personId/movie_credits?language=fr-FR'),
-          headers: _headers),
+      http.get(Uri.parse('${AppConstants.tmdbBaseUrl}/person/$personId?language=fr-FR'), headers: _headers),
+      http.get(Uri.parse('${AppConstants.tmdbBaseUrl}/person/$personId/movie_credits?language=fr-FR'), headers: _headers),
     ]);
     if (results[0].statusCode != 200) throw Exception('Impossible de charger la personne.');
     final details = jsonDecode(results[0].body) as Map<String, dynamic>;
@@ -174,13 +159,76 @@ class MovieService {
   Future<List<Map<String, dynamic>>> searchPeople(String query) async {
     if (query.trim().isEmpty) return [];
     final response = await http.get(
-      Uri.parse(
-          '${AppConstants.tmdbBaseUrl}/search/person?query=${Uri.encodeComponent(query)}&language=fr-FR'),
+      Uri.parse('${AppConstants.tmdbBaseUrl}/search/person?query=${Uri.encodeComponent(query)}&language=fr-FR'),
+      headers: _headers,
+    );
+    if (response.statusCode != 200) return [];
+    return List<Map<String, dynamic>>.from(jsonDecode(response.body)['results'] ?? []);
+  }
+
+  Future<List<Genre>> getGenres() async {
+    final response = await http.get(
+      Uri.parse('${AppConstants.tmdbBaseUrl}/genre/movie/list?language=fr-FR'),
       headers: _headers,
     );
     if (response.statusCode != 200) return [];
     final data = jsonDecode(response.body);
-    return List<Map<String, dynamic>>.from(data['results'] ?? []);
+    return (data['genres'] as List)
+        .map((e) => Genre.fromJson(e))
+        .toList();
+  }
+
+  Future<(List<SearchResult>, int)> searchMulti(String query, int page) async {
+    final uri = Uri.parse(
+      '${AppConstants.tmdbBaseUrl}/search/multi'
+          '?query=${Uri.encodeComponent(query)}'
+          '&page=$page'
+          '&language=fr-FR'
+          '&include_adult=false',
+    );
+    final response = await http.get(uri, headers: _headers);
+    if (response.statusCode != 200) return (<SearchResult>[], 0);
+    final data    = jsonDecode(response.body);
+    final results = <SearchResult>[];
+    for (final item in data['results'] as List) {
+      final type = item['media_type'] as String?;
+      if (type == 'movie') {
+        final movie = Movie.fromJson(item);
+        if (movie.posterPath.isNotEmpty) results.add(MovieResult(movie));
+      } else if (type == 'person') {
+        final person = SearchPerson.fromJson(item);
+        if (person.name.isNotEmpty) results.add(PersonResult(person));
+      }
+    }
+    return (results, data['total_pages'] as int);
+  }
+
+  Future<(List<SearchResult>, int)> discoverMovies({
+    required int page,
+    Set<int> genreIds = const {},
+    double minRating = 0.0,
+    int? year,
+  }) async {
+    final buffer = StringBuffer(
+      '${AppConstants.tmdbBaseUrl}/discover/movie'
+          '?page=$page'
+          '&language=fr-FR'
+          '&include_adult=false'
+          '&sort_by=popularity.desc',
+    );
+    if (genreIds.isNotEmpty) buffer.write('&with_genres=${genreIds.join(",")}');
+    if (minRating > 0) buffer.write('&vote_average.gte=$minRating&vote_count.gte=100');
+    if (year != null) buffer.write('&primary_release_year=$year');
+
+    final response = await http.get(Uri.parse(buffer.toString()), headers: _headers);
+    if (response.statusCode != 200) return (<SearchResult>[], 0);
+    final data    = jsonDecode(response.body);
+    final results = (data['results'] as List)
+        .map((e) => Movie.fromJson(e))
+        .where((m) => m.posterPath.isNotEmpty)
+        .map((m) => MovieResult(m) as SearchResult)
+        .toList();
+    return (results, data['total_pages'] as int);
   }
 
   Future<CollectionDetail> getCollection(int collectionId) async {
@@ -188,25 +236,29 @@ class MovieService {
       Uri.parse('${AppConstants.tmdbBaseUrl}/collection/$collectionId?language=fr-FR'),
       headers: _headers,
     );
-    if (response.statusCode != 200) {
-      throw Exception('Impossible de charger la collection.');
-    }
+    if (response.statusCode != 200) throw Exception('Impossible de charger la collection.');
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     final parts = (data['parts'] as List)
         .map((e) => Movie.fromJson(e))
         .toList()
       ..sort((a, b) => a.releaseDate.compareTo(b.releaseDate));
-
     return CollectionDetail(
-      name:         data['name']         ?? '',
-      overview:     data['overview']     ?? '',
+      name:         data['name']          ?? '',
+      overview:     data['overview']      ?? '',
       backdropPath: data['backdrop_path'] ?? '',
       parts:        parts,
     );
   }
-  Future<Movie?> getMovieMatch(
+
+  Future<Movie?> getMovieMatch(Map<CineMatchAnswerKey, String> answers) async {
+    final movie = await _fetchMovieMatch(answers, fallback: false);
+    if (movie != null) return movie;
+    return _fetchMovieMatch(answers, fallback: true);
+  }
+
+  Future<Movie?> _fetchMovieMatch(
       Map<CineMatchAnswerKey, String> answers, {
-        bool fallback = false,
+        required bool fallback,
       }) async {
     final mood     = answers[CineMatchAnswerKey.mood]     ?? 'fun';
     final style    = answers[CineMatchAnswerKey.style]    ?? 'any';
@@ -233,12 +285,8 @@ class MovieService {
     final minRating  = fallback
         ? (baseRating - 0.5).clamp(5.0, 9.0)
         : baseRating.clamp(5.0, 9.0);
-    final minVotes   = fallback
-        ? CineMatchConstants.fallbackMinVoteCount
-        : CineMatchConstants.minVoteCount;
-    final pageRange  = fallback
-        ? CineMatchConstants.fallbackMaxRandomPage
-        : CineMatchConstants.maxRandomPage;
+    final minVotes   = fallback ? CineMatchConstants.fallbackMinVoteCount : CineMatchConstants.minVoteCount;
+    final pageRange  = fallback ? CineMatchConstants.fallbackMaxRandomPage : CineMatchConstants.maxRandomPage;
 
     final params = <String, String>{
       'language':         'fr-FR',
@@ -254,7 +302,6 @@ class MovieService {
 
     final uri = Uri.parse('${AppConstants.tmdbBaseUrl}/discover/movie')
         .replace(queryParameters: params);
-
     final response = await http.get(uri, headers: _headers);
     if (response.statusCode != 200) return null;
 
@@ -283,6 +330,4 @@ class MovieService {
     'long'   => {'with_runtime.gte': '121'},
     _        => {},
   };
-
-
 }

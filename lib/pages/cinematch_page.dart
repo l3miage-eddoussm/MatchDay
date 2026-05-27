@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../constants/cinematch_constants.dart';
 import '../models/cinematch_question.dart';
 import '../models/movie.dart';
 import '../services/movie_service.dart';
@@ -28,7 +29,7 @@ class _CineMatchPageState extends State<CineMatchPage>
   late final Animation<double>   _fadeAnim;
   late final Animation<Offset>   _slideAnim;
 
-  static final _questions = CineMatchQuestion.all;
+  static final _questions  = CineMatchQuestion.all;
   static final _answerKeys = CineMatchAnswerKey.values;
 
   @override
@@ -38,13 +39,11 @@ class _CineMatchPageState extends State<CineMatchPage>
       vsync: this,
       duration: const Duration(milliseconds: 350),
     );
-    _fadeAnim = CurvedAnimation(
-        parent: _animController, curve: Curves.easeOut);
+    _fadeAnim = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
     _slideAnim = Tween<Offset>(
       begin: const Offset(0.08, 0),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-        parent: _animController, curve: Curves.easeOut));
+    ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOut));
     _animController.forward();
   }
 
@@ -106,31 +105,19 @@ class _CineMatchPageState extends State<CineMatchPage>
     await _fetchMovie();
   }
 
-  Future<void> _fetchMovie({bool fallback = false}) async {
+  Future<void> _fetchMovie() async {
     try {
-      final movie = await MovieService().getMovieMatch(
-        _answers,
-        fallback: fallback,
-      );
-
+      final movie = await MovieService().getMovieMatch(_answers);
       if (!mounted) return;
-
-      if (movie == null && !fallback) {
-        await _fetchMovie(fallback: true);
-        return;
-      }
-
       await _transitionTo(() {
         _result    = movie;
-        _error     = movie == null
-            ? "Aucun film trouvé.\nEssaie d'autres réponses !"
-            : null;
+        _error     = movie == null ? CineMatchConstants.noMovieFound : null;
         _isLoading = false;
       });
     } catch (_) {
       if (!mounted) return;
       await _transitionTo(() {
-        _error     = "Une erreur est survenue.\nVérifie ta connexion et réessaie.";
+        _error     = CineMatchConstants.networkError;
         _isLoading = false;
       });
     }
