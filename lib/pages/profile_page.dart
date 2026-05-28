@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../constants.dart';
 import '../models/user_movie_action.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
@@ -6,6 +7,12 @@ import '../services/movie_action_service.dart';
 import '../services/movie_service.dart';
 import 'login_page.dart';
 import '../widgets/stats_share_card.dart';
+import '../widgets/profile_avatar.dart';
+import '../widgets/stat_card.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/movie_row.dart';
+import '../widgets/trophy_row.dart';
+import '../widgets/highlight_section.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -19,13 +26,14 @@ class _ProfilePageState extends State<ProfilePage> {
   int _selectedYear = DateTime.now().year;
   List<int> _years = [];
   int _activeTab = 0;
-
   String? _filterLevel;
   int _page = 1;
-  static const int _pageSize = 10;
-
   String? _actorImageUrl;
   String? _directorImageUrl;
+
+  static const int _pageSize = 10;
+  static const _text1 = Color(0xFF2E2E2E);
+
 
   @override
   void initState() {
@@ -51,9 +59,9 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _loadHighlightImages() async {
-    final actor = MovieActionService().getMostWatchedActorForYear(_selectedYear);
-    final director = MovieActionService().getMostWatchedDirectorForYear(_selectedYear);
-
+    final svc = MovieActionService();
+    final actor = svc.getMostWatchedActorForYear(_selectedYear);
+    final director = svc.getMostWatchedDirectorForYear(_selectedYear);
     if (actor != null) {
       final url = await MovieService().searchPersonImage(actor);
       if (mounted) setState(() => _actorImageUrl = url);
@@ -99,21 +107,23 @@ class _ProfilePageState extends State<ProfilePage> {
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const LoginPage()),
-      (_) => false,
+          (_) => false,
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final svc = MovieActionService();
     final allMovies = _filteredMovies;
     final paginatedMovies = allMovies.take(_page * _pageSize).toList();
-    final trophies = MovieActionService().getTrophiesForYear(_selectedYear);
-    final watchLater = MovieActionService().getWatchLaterList();
-    final avg = MovieActionService().getAverageRatingForYear(_selectedYear);
-    final dist = MovieActionService().getRatingDistributionForYear(_selectedYear);
-    final actor = MovieActionService().getMostWatchedActorForYear(_selectedYear);
-    final director = MovieActionService().getMostWatchedDirectorForYear(_selectedYear);
-    final genre = MovieActionService().getMostWatchedGenreForYear(_selectedYear);
+    final trophies = svc.getTrophiesForYear(_selectedYear);
+    final watchLater = svc.getWatchLaterList();
+    final avg = svc.getAverageRatingForYear(_selectedYear);
+    final dist = svc.getRatingDistributionForYear(_selectedYear);
+    final actor = svc.getMostWatchedActorForYear(_selectedYear);
+    final director = svc.getMostWatchedDirectorForYear(_selectedYear);
+    final genre = svc.getMostWatchedGenreForYear(_selectedYear);
+    final ratedCount = svc.getRatedMoviesForYear(_selectedYear).length;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -129,21 +139,24 @@ class _ProfilePageState extends State<ProfilePage> {
                 padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
                 child: StatsShareCard(
                   year: _selectedYear,
-                  username: _user != null
-                      ? '${_user!.firstName} ${_user!.lastName}'
-                      : '',
+                  username: _user != null ? '${_user!.firstName} ${_user!.lastName}' : '',
                   initials: _initials,
                 ),
               ),
             ),
           if (actor != null || director != null || genre != null)
-            SliverToBoxAdapter(child: _buildHighlights(actor, director, genre)),
-          SliverToBoxAdapter(
-            child: _buildTabBar(
-              MovieActionService().getRatedMoviesForYear(_selectedYear).length,
-              trophies.length,
-              watchLater.length,
+            SliverToBoxAdapter(
+              child: HighlightSection(
+                year: _selectedYear,
+                actor: actor,
+                director: director,
+                genre: genre,
+                actorImageUrl: _actorImageUrl,
+                directorImageUrl: _directorImageUrl,
+              ),
             ),
+          SliverToBoxAdapter(
+            child: _buildTabBar(ratedCount, trophies.length, watchLater.length),
           ),
           if (_activeTab == 0) ...[
             SliverToBoxAdapter(child: _buildFilters()),
@@ -170,38 +183,26 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
       title: const Text(
         'Profil',
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 16,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.2,
-        ),
+        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: 0.2),
       ),
       actions: [
         GestureDetector(
           onTap: _logout,
-          child: Padding(
-            padding: const EdgeInsets.only(right: 16),
+          child: const Padding(
+            padding: EdgeInsets.only(right: 16),
             child: Row(
-              children: const [
-                Icon(Icons.logout_rounded, size: 14, color: Color(0xFF444444)),
+              children: [
+                Icon(Icons.logout_rounded, size: 14, color: AppColors.secondary),
                 SizedBox(width: 5),
-                Text(
-                  'Déconnexion',
-                  style: TextStyle(
-                    color: Color(0xFF444444),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                Text('Déconnexion', style: TextStyle(color: AppColors.secondary, fontSize: 12, fontWeight: FontWeight.w600)),
               ],
             ),
           ),
         ),
       ],
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(1),
-        child: Container(height: 1, color: const Color(0xFF1A1A1A)),
+      bottom: const PreferredSize(
+        preferredSize: Size.fromHeight(1),
+        child: ColoredBox(color: Color(0xFF1A1A1A), child: SizedBox(height: 1)),
       ),
     );
   }
@@ -209,16 +210,13 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget _buildHeader(double avg, int filmCount, int trophyCount) {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0xFF111111))),
-      ),
+      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.card))),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              _buildAvatar(),
+              ProfileAvatar(initials: _initials),
               const SizedBox(width: 20),
               Expanded(
                 child: Column(
@@ -237,11 +235,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     const SizedBox(height: 4),
                     Text(
                       _user?.email ?? '',
-                      style: const TextStyle(
-                        color: Color(0xFF3A3A3A),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
+                      style: const TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
@@ -251,83 +245,19 @@ class _ProfilePageState extends State<ProfilePage> {
           const SizedBox(height: 24),
           Row(
             children: [
-              Expanded(child: _buildStatCard('$filmCount', 'Films vus', Icons.movie_rounded)),
+              Expanded(child: StatCard(value: '$filmCount', label: 'Films vus', icon: Icons.movie_rounded)),
               const SizedBox(width: 10),
               Expanded(
-                child: _buildStatCard(
-                  avg > 0 ? avg.toStringAsFixed(1) : '—',
-                  'Note moy.',
-                  Icons.star_rounded,
+                child: StatCard(
+                  value: avg > 0 ? avg.toStringAsFixed(1) : '—',
+                  label: 'Note moy.',
+                  icon: Icons.star_rounded,
                   accent: true,
                 ),
               ),
               const SizedBox(width: 10),
-              Expanded(child: _buildStatCard('$trophyCount', 'Trophées', Icons.emoji_events_rounded)),
+              Expanded(child: StatCard(value: '$trophyCount', label: 'Trophées', icon: Icons.emoji_events_rounded)),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAvatar() {
-    return Container(
-      width: 68,
-      height: 68,
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        shape: BoxShape.circle,
-        border: Border.all(color: const Color(0xFF2A2A2A), width: 2),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        _initials,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 24,
-          fontWeight: FontWeight.w700,
-          letterSpacing: -0.5,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatCard(String value, String label, IconData icon, {bool accent = false}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F0F0F),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF1A1A1A)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            icon,
-            size: 15,
-            color: accent ? const Color(0xFFE53935) : const Color(0xFF333333),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              color: accent ? const Color(0xFFE53935) : Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.5,
-              height: 1,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Color(0xFF333333),
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.2,
-            ),
           ),
         ],
       ),
@@ -342,12 +272,7 @@ class _ProfilePageState extends State<ProfilePage> {
         children: [
           const Text(
             'PÉRIODE',
-            style: TextStyle(
-              color: Color(0xFF2E2E2E),
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 2,
-            ),
+            style: TextStyle(color: _text1, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 2),
           ),
           const SizedBox(height: 12),
           SizedBox(
@@ -366,17 +291,15 @@ class _ProfilePageState extends State<ProfilePage> {
                     margin: const EdgeInsets.only(right: 8),
                     padding: const EdgeInsets.symmetric(horizontal: 18),
                     decoration: BoxDecoration(
-                      color: selected ? const Color(0xFFE53935) : const Color(0xFF0F0F0F),
+                      color: selected ? AppColors.accent : AppColors.card,
                       borderRadius: BorderRadius.circular(17),
-                      border: Border.all(
-                        color: selected ? const Color(0xFFE53935) : const Color(0xFF1E1E1E),
-                      ),
+                      border: Border.all(color: selected ? AppColors.accent : AppColors.border),
                     ),
                     alignment: Alignment.center,
                     child: Text(
                       '$year',
                       style: TextStyle(
-                        color: selected ? Colors.white : const Color(0xFF444444),
+                        color: selected ? Colors.white : AppColors.secondary,
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                       ),
@@ -396,7 +319,7 @@ class _ProfilePageState extends State<ProfilePage> {
     final total = dist.values.fold(0, (a, b) => a + b);
 
     Color barColor(int score) {
-      if (score >= 8) return const Color(0xFFE53935);
+      if (score >= 8) return AppColors.accent;
       if (score >= 6) return const Color(0xFFAB2424);
       if (score >= 4) return const Color(0xFF6B1515);
       return const Color(0xFF2A0A0A);
@@ -412,17 +335,9 @@ class _ProfilePageState extends State<ProfilePage> {
             children: [
               const Text(
                 'DISTRIBUTION',
-                style: TextStyle(
-                  color: Color(0xFF2E2E2E),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 2,
-                ),
+                style: TextStyle(color: _text1, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 2),
               ),
-              Text(
-                '$total films notés',
-                style: const TextStyle(color: Color(0xFF2E2E2E), fontSize: 10),
-              ),
+              Text('$total films notés', style: const TextStyle(color: _text1, fontSize: 10)),
             ],
           ),
           const SizedBox(height: 16),
@@ -447,21 +362,14 @@ class _ProfilePageState extends State<ProfilePage> {
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         if (count > 0)
-                          Text(
-                            '$count',
-                            style: TextStyle(
-                              color: bc,
-                              fontSize: 8,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
+                          Text('$count', style: TextStyle(color: bc, fontSize: 8, fontWeight: FontWeight.w800)),
                         const SizedBox(height: 3),
                         AnimatedContainer(
                           duration: const Duration(milliseconds: 600),
                           curve: Curves.easeOutCubic,
                           height: count > 0 ? 52.0 * ratio + 4 : 3,
                           decoration: BoxDecoration(
-                            color: count > 0 ? bc : const Color(0xFF111111),
+                            color: count > 0 ? bc : AppColors.card,
                             borderRadius: BorderRadius.circular(3),
                           ),
                         ),
@@ -469,7 +377,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         Text(
                           '$score',
                           style: TextStyle(
-                            color: count > 0 ? const Color(0xFF444444) : const Color(0xFF1E1E1E),
+                            color: count > 0 ? AppColors.secondary : AppColors.border,
                             fontSize: 9,
                             fontWeight: FontWeight.w600,
                           ),
@@ -482,119 +390,48 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ),
           const SizedBox(height: 20),
-          Container(height: 1, color: const Color(0xFF111111)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHighlights(String? actor, String? director, String? genre) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'TOP $_selectedYear',
-            style: const TextStyle(
-              color: Color(0xFF2E2E2E),
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 2,
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (actor != null || director != null)
-            Row(
-              children: [
-                if (actor != null)
-                  Expanded(
-                    child: _HighlightTile(
-                      icon: Icons.person_rounded,
-                      label: 'ACTEUR',
-                      value: actor,
-                      imageUrl: _actorImageUrl,
-                    ),
-                  ),
-                if (actor != null && director != null) const SizedBox(width: 10),
-                if (director != null)
-                  Expanded(
-                    child: _HighlightTile(
-                      icon: Icons.videocam_rounded,
-                      label: 'RÉALISATEUR',
-                      value: director,
-                      imageUrl: _directorImageUrl,
-                    ),
-                  ),
-              ],
-            ),
-          if (genre != null) ...[
-            if (actor != null || director != null) const SizedBox(height: 10),
-            _GenreHighlightTile(genre: genre),
-          ],
-          const SizedBox(height: 22),
-          Container(height: 1, color: const Color(0xFF111111)),
+          const ColoredBox(color: AppColors.card, child: SizedBox(height: 1, width: double.infinity)),
         ],
       ),
     );
   }
 
   Widget _buildTabBar(int movieCount, int trophyCount, int watchCount) {
-    final tabs = [
-      ('Films', movieCount),
-      ('Trophées', trophyCount),
-      ('À voir', watchCount),
-    ];
+    final tabs = [('Films', movieCount), ('Trophées', trophyCount), ('À voir', watchCount)];
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
       child: Row(
         children: List.generate(tabs.length, (i) {
           final selected = _activeTab == i;
           return GestureDetector(
-            onTap: () => setState(() {
-              _activeTab = i;
-              _filterLevel = null;
-              _page = 1;
-            }),
+            onTap: () => setState(() { _activeTab = i; _filterLevel = null; _page = 1; }),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
               curve: Curves.easeOut,
               margin: const EdgeInsets.only(right: 8),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
               decoration: BoxDecoration(
-                color: selected ? const Color(0xFFE53935) : const Color(0xFF0F0F0F),
+                color: selected ? AppColors.accent : AppColors.card,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: selected ? const Color(0xFFE53935) : const Color(0xFF1A1A1A),
-                ),
+                border: Border.all(color: selected ? AppColors.accent : AppColors.surfaceDark),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     tabs[i].$1,
-                    style: TextStyle(
-                      color: selected ? Colors.white : const Color(0xFF444444),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: TextStyle(color: selected ? Colors.white : AppColors.secondary, fontSize: 12, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(width: 6),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: selected
-                          ? Colors.white.withOpacity(0.2)
-                          : const Color(0xFF1A1A1A),
+                      color: selected ? Colors.white.withValues(alpha: 0.2) : AppColors.surfaceDark,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
                       '${tabs[i].$2}',
-                      style: TextStyle(
-                        color: selected ? Colors.white : const Color(0xFF3A3A3A),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                      ),
+                      style: TextStyle(color: selected ? Colors.white : AppColors.muted, fontSize: 10, fontWeight: FontWeight.w800),
                     ),
                   ),
                 ],
@@ -610,61 +447,41 @@ class _ProfilePageState extends State<ProfilePage> {
     const filters = [
       ('good', 'Bon', Color(0xFF4CAF50)),
       ('medium', 'Moyen', Color(0xFFFF9800)),
-      ('low', 'Faible', Color(0xFFE53935)),
+      ('low', 'Faible', AppColors.accent),
     ];
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
       child: Row(
-        children: [
-          ...filters.map((f) {
-            final selected = _filterLevel == f.$1;
-            return GestureDetector(
-              onTap: () => setState(() {
-                _filterLevel = selected ? null : f.$1;
-                _page = 1;
-              }),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                margin: const EdgeInsets.only(right: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: selected ? f.$3.withOpacity(0.12) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: selected ? f.$3 : const Color(0xFF1E1E1E),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 5,
-                      height: 5,
-                      decoration: BoxDecoration(color: f.$3, shape: BoxShape.circle),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      f.$2,
-                      style: TextStyle(
-                        color: selected ? f.$3 : const Color(0xFF444444),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
+        children: filters.map((f) {
+          final selected = _filterLevel == f.$1;
+          return GestureDetector(
+            onTap: () => setState(() { _filterLevel = selected ? null : f.$1; _page = 1; }),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              margin: const EdgeInsets.only(right: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: selected ? f.$3.withValues(alpha: 0.12) : Colors.transparent,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: selected ? f.$3 : AppColors.border),
               ),
-            );
-          }),
-        ],
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(width: 5, height: 5, decoration: BoxDecoration(color: f.$3, shape: BoxShape.circle)),
+                  const SizedBox(width: 6),
+                  Text(f.$2, style: TextStyle(color: selected ? f.$3 : AppColors.secondary, fontSize: 11, fontWeight: FontWeight.w700)),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }
 
   Widget _buildLoadMore() {
-    final allCount = _filteredMovies.length;
-    final shown = _page * _pageSize;
-    final remaining = allCount - shown;
+    final remaining = _filteredMovies.length - _page * _pageSize;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
       child: GestureDetector(
@@ -673,23 +490,16 @@ class _ProfilePageState extends State<ProfilePage> {
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
-            color: const Color(0xFF0F0F0F),
+            color: AppColors.card,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFF1E1E1E)),
+            border: Border.all(color: AppColors.border),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.expand_more_rounded, color: Color(0xFF444444), size: 16),
+              const Icon(Icons.expand_more_rounded, color: AppColors.secondary, size: 16),
               const SizedBox(width: 6),
-              Text(
-                'Voir $remaining films de plus',
-                style: const TextStyle(
-                  color: Color(0xFF444444),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+              Text('Voir $remaining films de plus', style: const TextStyle(color: AppColors.secondary, fontSize: 12, fontWeight: FontWeight.w700)),
             ],
           ),
         ),
@@ -699,142 +509,14 @@ class _ProfilePageState extends State<ProfilePage> {
 
   List<Widget> _buildMoviesList(List<UserMovieAction> movies) {
     if (movies.isEmpty) {
-      return [
-        const SliverToBoxAdapter(
-          child: _EmptyState(
-            icon: Icons.movie_creation_outlined,
-            message: 'Aucun film pour ce filtre',
-          ),
-        ),
-      ];
+      return [const SliverToBoxAdapter(child: EmptyState(icon: Icons.movie_creation_outlined, message: 'Aucun film pour ce filtre'))];
     }
     return [
       SliverPadding(
         padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
         sliver: SliverList(
           delegate: SliverChildBuilderDelegate(
-            (_, i) {
-              final a = movies[i];
-              final rating = a.rating ?? 0;
-              return Container(
-                margin: const EdgeInsets.only(bottom: 1),
-                padding: const EdgeInsets.symmetric(vertical: 13),
-                decoration: const BoxDecoration(
-                  border: Border(bottom: BorderSide(color: Color(0xFF0F0F0F))),
-                ),
-                child: Row(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(5),
-                      child: a.posterPath.isNotEmpty
-                          ? Image.network(
-                              'https://image.tmdb.org/t/p/w200${a.posterPath}',
-                              width: 38,
-                              height: 56,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => _posterFallback(),
-                            )
-                          : _posterFallback(),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            a.movieTitle,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: -0.2,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          if (a.directors.isNotEmpty) ...[
-                            const SizedBox(height: 3),
-                            Text(
-                              a.directors.join(', '),
-                              style: const TextStyle(
-                                color: Color(0xFF3A3A3A),
-                                fontSize: 11,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                          if (a.genres.isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Row(
-                              children: a.genres.take(2).map((g) => Container(
-                                margin: const EdgeInsets.only(right: 5),
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF111111),
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: const Color(0xFF1A1A1A)),
-                                ),
-                                child: Text(
-                                  g,
-                                  style: const TextStyle(
-                                    color: Color(0xFF3A3A3A),
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              )).toList(),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0F0F0F),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: const Color(0xFF1A1A1A)),
-                          ),
-                          child: Text(
-                            '${rating.toStringAsFixed(0)}/10',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: List.generate(5, (s) {
-                            final filled = (s + 1) * 2 <= rating;
-                            final half = !filled && s * 2 < rating && (s + 1) * 2 > rating;
-                            return Icon(
-                              filled
-                                  ? Icons.star_rounded
-                                  : half
-                                      ? Icons.star_half_rounded
-                                      : Icons.star_outline_rounded,
-                              color: const Color(0xFFE53935),
-                              size: 12,
-                            );
-                          }),
-                        ),
-                        if (a.trophy != null) ...[
-                          const SizedBox(height: 4),
-                          Text(a.trophy!.emoji, style: const TextStyle(fontSize: 12)),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-              );
-            },
+                (_, i) => MovieRow(action: movies[i], showRating: true),
             childCount: movies.length,
           ),
         ),
@@ -844,86 +526,14 @@ class _ProfilePageState extends State<ProfilePage> {
 
   List<Widget> _buildTrophiesList(List<UserMovieAction> trophies) {
     if (trophies.isEmpty) {
-      return [
-        const SliverToBoxAdapter(
-          child: _EmptyState(
-            icon: Icons.emoji_events_outlined,
-            message: 'Passe des quiz pour gagner des trophées',
-          ),
-        ),
-      ];
+      return [const SliverToBoxAdapter(child: EmptyState(icon: Icons.emoji_events_outlined, message: 'Passe des quiz pour gagner des trophées'))];
     }
     return [
       SliverPadding(
         padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
         sliver: SliverList(
           delegate: SliverChildBuilderDelegate(
-            (_, i) {
-              final a = trophies[i];
-              final t = a.trophy!;
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0A0A0A),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF141414)),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 46,
-                      height: 46,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF111111),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFF1E1E1E)),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(t.emoji, style: const TextStyle(fontSize: 22)),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            a.movieTitle,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            t.label,
-                            style: const TextStyle(
-                              color: Color(0xFF444444),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (a.posterPath.isNotEmpty)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(5),
-                        child: Image.network(
-                          'https://image.tmdb.org/t/p/w200${a.posterPath}',
-                          width: 32,
-                          height: 46,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const SizedBox(),
-                        ),
-                      ),
-                  ],
-                ),
-              );
-            },
+                (_, i) => TrophyRow(action: trophies[i]),
             childCount: trophies.length,
           ),
         ),
@@ -933,237 +543,18 @@ class _ProfilePageState extends State<ProfilePage> {
 
   List<Widget> _buildWatchLaterList(List<UserMovieAction> list) {
     if (list.isEmpty) {
-      return [
-        const SliverToBoxAdapter(
-          child: _EmptyState(
-            icon: Icons.bookmark_border_rounded,
-            message: 'Ajoute des films à voir plus tard',
-          ),
-        ),
-      ];
+      return [const SliverToBoxAdapter(child: EmptyState(icon: Icons.bookmark_border_rounded, message: 'Ajoute des films à voir plus tard'))];
     }
     return [
       SliverPadding(
         padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
         sliver: SliverList(
           delegate: SliverChildBuilderDelegate(
-            (_, i) {
-              final a = list[i];
-              return Container(
-                margin: const EdgeInsets.only(bottom: 1),
-                padding: const EdgeInsets.symmetric(vertical: 13),
-                decoration: const BoxDecoration(
-                  border: Border(bottom: BorderSide(color: Color(0xFF0F0F0F))),
-                ),
-                child: Row(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(5),
-                      child: a.posterPath.isNotEmpty
-                          ? Image.network(
-                              'https://image.tmdb.org/t/p/w200${a.posterPath}',
-                              width: 38,
-                              height: 56,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => _posterFallback(),
-                            )
-                          : _posterFallback(),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Text(
-                        a.movieTitle,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Icon(Icons.bookmark_rounded, color: Color(0xFFE53935), size: 18),
-                  ],
-                ),
-              );
-            },
+                (_, i) => MovieRow(action: list[i], showRating: false),
             childCount: list.length,
           ),
         ),
       ),
     ];
   }
-
-  Widget _posterFallback() => Container(
-    width: 38,
-    height: 56,
-    decoration: BoxDecoration(
-      color: const Color(0xFF111111),
-      borderRadius: BorderRadius.circular(5),
-    ),
-  );
-}
-
-class _HighlightTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final String? imageUrl;
-
-  const _HighlightTile({
-    required this.icon,
-    required this.label,
-    required this.value,
-    this.imageUrl,
-  });
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: const Color(0xFF0A0A0A),
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: const Color(0xFF141414)),
-    ),
-    child: Row(
-      children: [
-        ClipOval(
-          child: imageUrl != null
-              ? Image.network(
-                  imageUrl!,
-                  width: 42,
-                  height: 42,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => _iconFallback(),
-                )
-              : _iconFallback(),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Color(0xFF2E2E2E),
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                value,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.2,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-
-  Widget _iconFallback() => Container(
-    width: 42,
-    height: 42,
-    decoration: const BoxDecoration(
-      color: Color(0xFF111111),
-      shape: BoxShape.circle,
-    ),
-    child: Icon(icon, color: const Color(0xFF333333), size: 18),
-  );
-}
-
-class _GenreHighlightTile extends StatelessWidget {
-  final String genre;
-
-  const _GenreHighlightTile({required this.genre});
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-    decoration: BoxDecoration(
-      color: const Color(0xFF0A0A0A),
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: const Color(0xFF141414)),
-    ),
-    child: Row(
-      children: [
-        Container(
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(
-            color: const Color(0xFF111111),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFF1A1A1A)),
-          ),
-          child: const Icon(Icons.local_movies_rounded, color: Color(0xFF333333), size: 18),
-        ),
-        const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'GENRE FAVORI',
-              style: TextStyle(
-                color: Color(0xFF2E2E2E),
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1,
-              ),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              genre,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-        const Spacer(),
-        const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF1E1E1E), size: 12),
-      ],
-    ),
-  );
-}
-
-class _EmptyState extends StatelessWidget {
-  final IconData icon;
-  final String message;
-
-  const _EmptyState({required this.icon, required this.message});
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 64),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, color: const Color(0xFF1A1A1A), size: 40),
-        const SizedBox(height: 14),
-        Text(
-          message,
-          style: const TextStyle(
-            color: Color(0xFF2E2E2E),
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ],
-    ),
-  );
 }

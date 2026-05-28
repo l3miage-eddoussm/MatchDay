@@ -14,7 +14,7 @@ class QuizConfirmDialog extends StatelessWidget {
             color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800),
       ),
       content: const Text(
-        "Tu ne pourras passer ce quiz qu'une seule fois.\n\nSelon ton score, tu débloques des avatars basés sur les personnages du film.\n\nBonne chance !",
+        "Tu ne pourras passer ce quiz qu'une seule fois.\n\nSelon ton score, tu débloques des Throphés du film.\n\nBonne chance !",
         style: TextStyle(
             color: Color(0xFF888888), fontSize: 13, height: 1.5),
       ),

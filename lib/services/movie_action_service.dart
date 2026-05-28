@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
+
 import '../models/user_movie_action.dart';
 import '../models/movie_detail.dart';
 import 'storage_service.dart';
@@ -8,7 +10,12 @@ class MovieActionService {
 
   factory MovieActionService() => _instance;
 
-  MovieActionService._internal();
+  MovieActionService._internal() : _storage = StorageService();
+
+  final StorageService _storage;
+
+  @visibleForTesting
+  MovieActionService.withStorage(this._storage);
 
   String? _currentUserEmail;
 
@@ -24,7 +31,7 @@ class MovieActionService {
   }
 
   Map<int, UserMovieAction> _getAll() {
-    final raw = StorageService().getItem(_storageKey);
+    final raw = _storage.getItem(_storageKey);
     if (raw == null) return {};
     final decoded = jsonDecode(raw) as Map<String, dynamic>;
     return decoded.map(
@@ -36,7 +43,7 @@ class MovieActionService {
     final encoded = jsonEncode(
       actions.map((k, v) => MapEntry(k.toString(), v.toJson())),
     );
-    StorageService().setItem(_storageKey, encoded);
+    _storage.setItem(_storageKey, encoded);
   }
 
   UserMovieAction? getAction(int movieId) => _getAll()[movieId];

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import '../models/user.dart';
 import 'movie_action_service.dart';
 import 'storage_service.dart';
@@ -9,7 +10,12 @@ class AuthService {
 
   factory AuthService() => _instance;
 
-  AuthService._internal();
+  AuthService._internal() : _storage = StorageService();
+
+  final StorageService _storage;
+
+  @visibleForTesting
+  AuthService.withStorage(this._storage);
 
   static const String _usersKey = 'cineart_users';
   static const String _currentUserKey = 'cineart_current_user';
@@ -24,7 +30,7 @@ class AuthService {
     required String email,
     required String password,
   }) async {
-    final existingRaw = StorageService().getItem(_usersKey);
+    final existingRaw = _storage.getItem(_usersKey);
     final List<dynamic> users =
     existingRaw != null ? jsonDecode(existingRaw) : [];
 
@@ -41,14 +47,14 @@ class AuthService {
     );
 
     users.add(newUser.toJson());
-    StorageService().setItem(_usersKey, jsonEncode(users));
+    _storage.setItem(_usersKey, jsonEncode(users));
   }
 
   Future<User> login({
     required String email,
     required String password,
   }) async {
-    final raw = StorageService().getItem(_usersKey);
+    final raw = _storage.getItem(_usersKey);
     final List<dynamic> users = raw != null ? jsonDecode(raw) : [];
 
     final hash = _hashPassword(password);
@@ -62,18 +68,18 @@ class AuthService {
     }
 
     final user = User.fromJson(match);
-    StorageService().setItem(_currentUserKey, jsonEncode(user.toJson()));
+    _storage.setItem(_currentUserKey, jsonEncode(user.toJson()));
     return user;
   }
 
   Future<User?> getCurrentUser() async {
-    final raw = StorageService().getItem(_currentUserKey);
+    final raw = _storage.getItem(_currentUserKey);
     if (raw == null) return null;
     return User.fromJson(jsonDecode(raw));
   }
 
   Future<void> logout() async {
     MovieActionService().clearUser();
-    StorageService().remove(_currentUserKey);
+    _storage.remove(_currentUserKey);
   }
 }
