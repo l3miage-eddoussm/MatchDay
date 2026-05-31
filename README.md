@@ -29,11 +29,15 @@ Application mobile de découverte et de gestion de films, développée avec Flut
 
 ```
 lib/
-├── main.dart                        # Point d'entrée de l'application
-├── constants/                       # Constantes globales (clés API, URLs, paramètres CineMatch)
-│   ├── app_constants.dart
-│   └── cinematch_constants.dart
-├── models/                          # Modèles de données
+├── main.dart                          # Point d'entrée de l'application
+├── app.dart                           # MaterialApp, thème, route initiale
+├── constants.dart                     # Constantes globales (AppColors, AppStrings)
+├── constants/
+│   ├── cinematch_constants.dart       # Constantes du questionnaire CineMatch
+│   └── genre_constants.dart          # Liste statique des genres TMDB
+├── utils/
+│   └── app_router.dart               # Navigation centralisée (fadeRoute, routes)
+├── models/                            # Modèles de données avec fromJson / toJson
 │   ├── user.dart
 │   ├── movie.dart
 │   ├── movie_detail.dart
@@ -43,26 +47,59 @@ lib/
 │   ├── search_result.dart
 │   ├── collection_detail.dart
 │   ├── cinematch_question.dart
-│   └── user_movie_action.dart
-├── services/                        # Couche métier et accès aux données
-│   ├── storage_service.dart         # Singleton — stockage local (localstorage)
-│   ├── auth_service.dart            # Singleton — authentification locale
-│   ├── movie_service.dart           # Singleton — appels API TMDB
-│   ├── movie_action_service.dart    # Singleton — actions utilisateur par film
-│   └── share_service.dart           # Singleton — partage d'images
-└── pages/                           # Ecrans de l'application
-    ├── home_page.dart
-    ├── login_page.dart
-    ├── register_page.dart
-    ├── movie_detail_page.dart
-    ├── person_detail_page.dart
-    ├── search_page.dart
-    ├── discover_page.dart
-    ├── profile_page.dart
-    ├── stats_page.dart
-    ├── watch_later_page.dart
-    ├── trophies_page.dart
-    └── cinematch_page.dart
+│   ├── user_movie_action.dart
+│   └── trivia_question.dart          # Modèle de question du quiz trivia
+├── services/                          # Couche métier — tous en Singleton (factory)
+│   ├── storage_service.dart          # Singleton — stockage local JSON (localstorage)
+│   ├── auth_service.dart             # Singleton — authentification locale
+│   ├── movie_service.dart            # Singleton — appels API TMDB
+│   ├── movie_action_service.dart     # Singleton — notes, watchlater, quiz
+│   └── share_service.dart            # Singleton — screenshot + partage natif
+├── pages/                             # Écrans de l'application
+│   ├── splash_page.dart              # Écran de démarrage
+│   ├── login_page.dart               # Connexion utilisateur
+│   ├── register_page.dart            # Inscription utilisateur
+│   ├── home_page.dart                # Hub principal — sections de films par catégorie
+│   ├── search_page.dart              # Recherche multi-type + filtres avancés
+│   ├── movie_detail_page.dart        # Détail d'un film (crédits, vidéos, images)
+│   ├── collection_page.dart          # Timeline d'une saga / collection
+│   ├── person_page.dart              # Filmographie d'un acteur ou réalisateur
+│   ├── profile_page.dart             # Profil utilisateur et statistiques
+│   ├── image_gallery_page.dart       # Galerie plein écran des images d'un film
+│   ├── cinematch_page.dart           # Recommandation par questionnaire animé
+│   └── trivia_quiz_page.dart         # Quiz trivia basé sur le casting réel TMDB
+└── widgets/                           # Composants réutilisables (StatelessWidget)
+    ├── movie_card.dart                # Carte film verticale (poster + titre + note)
+    ├── movie_row.dart                 # Ligne horizontale scrollable de films
+    ├── movie_info_header.dart         # En-tête d'infos film (titre, genres, durée)
+    ├── movie_poster_placeholder.dart  # Placeholder quand le poster est absent
+    ├── action_buttons.dart            # Boutons noter / watchlater sur un film
+    ├── rating_bottom_sheet.dart       # Bottom sheet de notation avec étoiles
+    ├── section_title.dart             # Titre de section standardisé
+    ├── cast_section.dart              # Liste horizontale du casting
+    ├── video_section.dart             # Liste des bandes-annonces (YouTube)
+    ├── images_section.dart            # Galerie horizontale des images
+    ├── similar_movies_section.dart    # Section films similaires
+    ├── collection_header.dart         # En-tête de la page collection / saga
+    ├── collection_movie_card.dart     # Carte film dans la timeline de collection
+    ├── collection_timeline_dot.dart   # Point de repère dans la timeline
+    ├── search_movie_card.dart         # Carte film dans les résultats de recherche
+    ├── search_person_card.dart        # Carte personne dans les résultats de recherche
+    ├── cinematch_top_bar.dart         # Barre supérieure du questionnaire CineMatch
+    ├── cinematch_question_card.dart   # Carte d'une question CineMatch animée
+    ├── cinematch_result_card.dart     # Carte du film recommandé par CineMatch
+    ├── cinematch_error_card.dart      # Carte d'erreur CineMatch (réseau, aucun film)
+    ├── cinematch_progress_bar.dart    # Barre de progression du questionnaire
+    ├── cinematch_loading.dart         # Indicateur de chargement CineMatch
+    ├── quiz_confirm_dialog.dart       # Dialog de confirmation avant le quiz trivia
+    ├── share_card.dart                # Carte de partage de critique (screenshot)
+    ├── stats_share_card.dart          # Carte de partage des statistiques profil
+    ├── highlight_section.dart         # Section mise en avant (hero ou featured)
+    ├── stat_card.dart                 # Carte de statistique individuelle (profil)
+    ├── trophy_row.dart                # Ligne de trophée dans le profil
+    ├── profile_avatar.dart            # Avatar utilisateur avec initiales
+    ├── empty_state.dart               # Écran vide générique (aucun résultat)
+    └── error_list.dart                # Liste d'erreurs de validation (formulaires)
 ```
 
 ***
